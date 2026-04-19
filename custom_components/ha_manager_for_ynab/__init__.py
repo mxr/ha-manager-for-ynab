@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
-from functools import partial
+from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, callback
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers.typing import ConfigType
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -55,7 +57,7 @@ class RuntimeData:
     @property
     def resolved_db_path(self) -> Path:
         """Return the configured DB path or the library default path."""
-        return Path(self.db_path) if self.db_path else _api.default_db_path()
+        return Path(self.db_path) if self.db_path else sqlite_default_db_path()
 
     @callback
     def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -80,6 +82,13 @@ class RuntimeData:
 type ManagerForYnabConfigEntry = ConfigEntry[RuntimeData]
 
 
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Manager for YNAB integration."""
+    hass.data.setdefault(DOMAIN, {})
+    await _async_register_services(hass)
+    return True
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ManagerForYnabConfigEntry
 ) -> bool:
@@ -87,8 +96,7 @@ async def async_setup_entry(
     entry.runtime_data = RuntimeData(
         token=entry.data[CONF_TOKEN], db_path=entry.data[CONF_DB_PATH]
     )
-
-    await _async_register_services(hass, entry)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.runtime_data
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -99,18 +107,15 @@ async def async_unload_entry(
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.services.async_remove(DOMAIN, SERVICE_PENDING_INCOME)
-        hass.services.async_remove(DOMAIN, SERVICE_SQLITE_EXPORT)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 
 
-async def _async_register_services(
-    hass: HomeAssistant, entry: ManagerForYnabConfigEntry
-) -> None:
+async def _async_register_services(hass: HomeAssistant) -> None:
     """Register integration services."""
 
     async def async_handle_pending_income(call: ServiceCall) -> None:
-        runtime_data = entry.runtime_data
+        runtime_data = _get_runtime_data(hass)
         try:
             updated_count = await hass.async_add_executor_job(
                 partial(
@@ -128,7 +133,7 @@ async def _async_register_services(
         runtime_data.async_set_pending_income_updated_count(updated_count)
 
     async def async_handle_sqlite_export(call: ServiceCall) -> None:
-        runtime_data = entry.runtime_data
+        runtime_data = _get_runtime_data(hass)
         try:
             await _api.run_sqlite_export(
                 runtime_data.token,
@@ -155,3 +160,13 @@ async def _async_register_services(
             async_handle_sqlite_export,
             schema=SQLITE_EXPORT_SCHEMA,
         )
+
+
+@callback
+def _get_runtime_data(hass: HomeAssistant) -> RuntimeData:
+    """Return the configured runtime data for the single integration entry."""
+    runtime_data_by_entry: dict[str, RuntimeData] = hass.data.get(DOMAIN, {})
+    if len(runtime_data_by_entry) != 1:
+        raise HomeAssistantError("Manager for YNAB is not configured")
+
+    return next(iter(runtime_data_by_entry.values()))

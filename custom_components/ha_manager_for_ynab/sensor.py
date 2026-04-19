@@ -71,4 +71,5 @@ class PendingIncomeUpdatedCountSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, str]:
         """Return sensor attributes."""
-        return {ATTR_DB_PATH: str(self._runtime_data.resolved_db_path)}
+        db_path = self._runtime_data.db_path or str(self._runtime_data.resolved_db_path)
+        return {ATTR_DB_PATH: db_path}
