@@ -14,6 +14,7 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+import voluptuous as vol
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
@@ -94,23 +95,6 @@ class FakeHass:
     async def async_add_executor_job(self, func: Callable[[], object]) -> object:
         self.executor_jobs.append(func)
         return func()
-
-
-def test_async_setup_entry_uses_default_db_path_when_config_empty() -> None:
-    hass = cast("HomeAssistant", FakeHass())
-    entry = cast(
-        "ConfigEntry[RuntimeData]",
-        SimpleNamespace(data={CONF_TOKEN: "token", CONF_DB_PATH: ""}),
-    )
-
-    with patch(
-        "custom_components.ha_manager_for_ynab._api.default_db_path",
-        return_value=Path("/tmp/default.sqlite3"),
-    ):
-        asyncio.run(async_setup_entry(hass, entry))
-
-    assert entry.runtime_data.db_path == "/tmp/default.sqlite3"
-
 
 def test_runtime_data_listener_unsubscribe_path() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
@@ -214,6 +198,17 @@ def test_user_schema_uses_default_db_path() -> None:
         }
 
 
+def test_user_schema_rejects_empty_db_path() -> None:
+    with (
+        patch(
+            "custom_components.ha_manager_for_ynab.config_flow._api.default_db_path",
+            return_value=Path("/tmp/default.sqlite3"),
+        ),
+        pytest.raises(vol.Invalid),
+    ):
+        _user_schema()({"token": "token", "db_path": ""})
+
+
 def test_api_default_db_path_delegates() -> None:
     fake_module = cast("Any", types.ModuleType("sqlite_export_for_ynab"))
     fake_module.default_db_path = lambda: Path("/tmp/default.sqlite3")
@@ -281,14 +276,16 @@ def test_config_flow_user_creates_entry() -> None:
     flow_any._abort_if_unique_id_configured = MagicMock()
     flow_any.async_create_entry = MagicMock(return_value={"type": "create_entry"})
 
-    result = asyncio.run(flow.async_step_user({"token": "token", "db_path": ""}))
+    result = asyncio.run(
+        flow.async_step_user({"token": "token", "db_path": "/tmp/ynab.sqlite3"})
+    )
 
     assert result == {"type": "create_entry"}
     flow_any.async_set_unique_id.assert_awaited_once_with(DOMAIN)
     flow_any._abort_if_unique_id_configured.assert_called_once_with()
     flow_any.async_create_entry.assert_called_once_with(
         title="Manager for YNAB",
-        data={"token": "token", "db_path": ""},
+        data={"token": "token", "db_path": "/tmp/ynab.sqlite3"},
     )
 
 
