@@ -32,4 +32,4 @@ repos:
   rev: v1.20.1
   hooks:
   - id: mypy
-    additional_dependencies: [homeassistant-stubs, manager-for-ynab, sqlite-export-for-ynab]
+    additional_dependencies: [manager-for-ynab, sqlite-export-for-ynab]
