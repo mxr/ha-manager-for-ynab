@@ -79,8 +79,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ManagerForYnabConfigEntry
 ) -> bool:
     """Set up Manager for YNAB from a config entry."""
-    db_path = entry.data[CONF_DB_PATH] or str(_api.default_db_path())
-    entry.runtime_data = RuntimeData(token=entry.data[CONF_TOKEN], db_path=db_path)
+    entry.runtime_data = RuntimeData(
+        token=entry.data[CONF_TOKEN], db_path=entry.data[CONF_DB_PATH]
+    )
 
     await _async_register_services(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

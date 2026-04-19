@@ -296,7 +296,7 @@ def test_async_setup_and_unload_entry() -> None:
     hass = cast("HomeAssistant", FakeHass())
     entry = cast(
         "ConfigEntry[RuntimeData]",
-        SimpleNamespace(data={CONF_TOKEN: "token", CONF_DB_PATH: ""}),
+        SimpleNamespace(data={CONF_TOKEN: "token", CONF_DB_PATH: "/tmp/db.sqlite3"}),
     )
 
     asyncio.run(async_setup_entry(hass, entry))

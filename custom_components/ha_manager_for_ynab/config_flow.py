@@ -16,7 +16,7 @@ from .const import DOMAIN
 from .const import NAME
 
 
-class ManagerForYnabConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
+class ManagerForYnabConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Manager for YNAB."""
 
     VERSION = 1
