@@ -1,0 +1,54 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Manager for YNAB is already configured."
+    },
+    "step": {
+      "user": {
+        "title": "Manager for YNAB",
+        "description": "Configure your YNAB personal access token and optional SQLite DB path.",
+        "data": {
+          "token": "YNAB personal access token",
+          "db_path": "SQLite database path (optional)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "pending_income_updated_count": {
+        "name": "Pending income updated count"
+      }
+    }
+  },
+  "services": {
+    "pending_income": {
+      "name": "Pending income",
+      "description": "Run manager-for-ynab pending income and update the sensor.",
+      "fields": {
+        "for_real": {
+          "name": "For real",
+          "description": "Apply the transaction date updates instead of running in dry-run mode."
+        },
+        "quiet": {
+          "name": "Quiet",
+          "description": "Suppress output from the underlying library."
+        }
+      }
+    },
+    "sqlite_export": {
+      "name": "SQLite export",
+      "description": "Run sqlite-export-for-ynab using the configured token and DB path.",
+      "fields": {
+        "full_refresh": {
+          "name": "Full refresh",
+          "description": "Drop and rebuild the SQLite export instead of performing an incremental sync."
+        },
+        "quiet": {
+          "name": "Quiet",
+          "description": "Suppress output from the underlying library."
+        }
+      }
+    }
+  }
+}

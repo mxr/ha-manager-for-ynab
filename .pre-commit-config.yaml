@@ -1,0 +1,35 @@
+default_language_version:
+  python: python3.14
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: check-docstring-first
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: requirements-txt-fixer
+  - id: trailing-whitespace
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.16.0
+  hooks:
+  - id: pretty-format-toml
+    args: [--autofix, --trailing-commas]
+  - id: pretty-format-yaml
+    args: [--autofix]
+- repo: https://github.com/asottile/setup-cfg-fmt
+  rev: v3.2.0
+  hooks:
+  - id: setup-cfg-fmt
+    args: [--min-py-version, '3.14']
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.15.10
+  hooks:
+  - id: ruff-check
+    args: [--fix]
+  - id: ruff-format
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.20.1
+  hooks:
+  - id: mypy
+    additional_dependencies: [homeassistant, manager-for-ynab, sqlite-export-for-ynab]
