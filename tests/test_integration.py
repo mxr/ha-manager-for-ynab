@@ -96,6 +96,7 @@ class FakeHass:
         self.executor_jobs.append(func)
         return func()
 
+
 def test_runtime_data_listener_unsubscribe_path() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     listener = Mock()
@@ -188,13 +189,15 @@ def test_service_schemas_default_false_values() -> None:
 
 
 def test_user_schema_uses_default_db_path() -> None:
+    default_db_path = Path("/tmp/default.sqlite3")
+
     with patch(
         "custom_components.ha_manager_for_ynab.config_flow._api.default_db_path",
-        return_value=Path("/tmp/default.sqlite3"),
+        return_value=default_db_path,
     ):
         assert _user_schema()({"token": "token"}) == {
             "token": "token",
-            "db_path": "/tmp/default.sqlite3",
+            "db_path": str(default_db_path),
         }
 
 

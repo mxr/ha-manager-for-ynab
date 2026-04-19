@@ -16,7 +16,7 @@ from .const import DOMAIN
 from .const import NAME
 
 
-class ManagerForYnabConfigFlow(ConfigFlow, domain=DOMAIN):
+class ManagerForYnabConfigFlow(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Handle a config flow for Manager for YNAB."""
 
     VERSION = 1
@@ -38,6 +38,8 @@ def _user_schema() -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_TOKEN): str,
-            vol.Optional(CONF_DB_PATH, default=str(_api.default_db_path())): str,
+            vol.Optional(CONF_DB_PATH, default=str(_api.default_db_path())): vol.All(
+                str, vol.Length(min=1)
+            ),
         }
     )
