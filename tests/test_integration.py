@@ -96,14 +96,20 @@ class FakeHass:
         return func()
 
 
-def test_runtime_data_uses_default_db_path_when_config_empty() -> None:
-    runtime_data = RuntimeData(token="token", db_path="")
+def test_async_setup_entry_uses_default_db_path_when_config_empty() -> None:
+    hass = cast("HomeAssistant", FakeHass())
+    entry = cast(
+        "ConfigEntry[RuntimeData]",
+        SimpleNamespace(data={CONF_TOKEN: "token", CONF_DB_PATH: ""}),
+    )
 
     with patch(
         "custom_components.ha_manager_for_ynab._api.default_db_path",
         return_value=Path("/tmp/default.sqlite3"),
     ):
-        assert runtime_data.resolved_db_path == Path("/tmp/default.sqlite3")
+        asyncio.run(async_setup_entry(hass, entry))
+
+    assert entry.runtime_data.db_path == "/tmp/default.sqlite3"
 
 
 def test_runtime_data_listener_unsubscribe_path() -> None:
@@ -138,7 +144,6 @@ def test_pending_income_sensor_reads_runtime_state() -> None:
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
 
     assert sensor.native_value == 5
-    assert sensor.extra_state_attributes == {"db_path": "/tmp/ynab.sqlite3"}
 
 
 def test_sensor_async_added_to_hass_registers_listener() -> None:
@@ -198,8 +203,15 @@ def test_service_schemas_default_false_values() -> None:
     assert SQLITE_EXPORT_SCHEMA({}) == {"full_refresh": False, "quiet": False}
 
 
-def test_user_schema_allows_empty_db_path() -> None:
-    assert _user_schema()({"token": "token"}) == {"token": "token", "db_path": ""}
+def test_user_schema_uses_default_db_path() -> None:
+    with patch(
+        "custom_components.ha_manager_for_ynab.config_flow._api.default_db_path",
+        return_value=Path("/tmp/default.sqlite3"),
+    ):
+        assert _user_schema()({"token": "token"}) == {
+            "token": "token",
+            "db_path": "/tmp/default.sqlite3",
+        }
 
 
 def test_api_default_db_path_delegates() -> None:

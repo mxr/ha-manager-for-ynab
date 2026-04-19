@@ -52,11 +52,6 @@ class RuntimeData:
     pending_income_updated_count: int | None = None
     _listeners: list[Callable[[], None]] = field(default_factory=list)
 
-    @property
-    def resolved_db_path(self) -> Path:
-        """Return the configured DB path or the library default path."""
-        return Path(self.db_path) if self.db_path else _api.default_db_path()
-
     @callback
     def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
         """Register a listener for in-memory state changes."""
@@ -84,9 +79,8 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ManagerForYnabConfigEntry
 ) -> bool:
     """Set up Manager for YNAB from a config entry."""
-    entry.runtime_data = RuntimeData(
-        token=entry.data[CONF_TOKEN], db_path=entry.data[CONF_DB_PATH]
-    )
+    db_path = entry.data[CONF_DB_PATH] or str(_api.default_db_path())
+    entry.runtime_data = RuntimeData(token=entry.data[CONF_TOKEN], db_path=db_path)
 
     await _async_register_services(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -116,7 +110,7 @@ async def _async_register_services(
                 partial(
                     _api.run_pending_income,
                     runtime_data.token,
-                    runtime_data.resolved_db_path,
+                    Path(runtime_data.db_path),
                     for_real=call.data["for_real"],
                     quiet=call.data["quiet"],
                 )
@@ -132,7 +126,7 @@ async def _async_register_services(
         try:
             await _api.run_sqlite_export(
                 runtime_data.token,
-                runtime_data.resolved_db_path,
+                Path(runtime_data.db_path),
                 full_refresh=call.data["full_refresh"],
                 quiet=call.data["quiet"],
             )

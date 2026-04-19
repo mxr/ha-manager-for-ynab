@@ -6,10 +6,10 @@
     "step": {
       "user": {
         "title": "Manager for YNAB",
-        "description": "Configure your YNAB personal access token and optional SQLite DB path.",
+        "description": "Configure your YNAB personal access token and SQLite DB path.",
         "data": {
           "token": "YNAB personal access token",
-          "db_path": "SQLite database path (optional)"
+          "db_path": "SQLite database path"
         }
       }
     }
