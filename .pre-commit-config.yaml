@@ -1,5 +1,7 @@
 default_language_version:
   python: python3.14
+ci:
+  skip: [mypy]  # venv is too big; runs with gihub action instead
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -32,4 +34,4 @@ repos:
   rev: v1.20.1
   hooks:
   - id: mypy
-    additional_dependencies: [manager-for-ynab, sqlite-export-for-ynab]
+    additional_dependencies: [homeassistant-stubs, manager-for-ynab, sqlite-export-for-ynab]

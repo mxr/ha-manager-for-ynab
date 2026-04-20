@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from manager_for_ynab.pending_income import pending_income
+from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def default_db_path() -> Path:
+    """Return the default SQLite export DB path."""
+    return sqlite_default_db_path()
 
 
 def run_pending_income(
