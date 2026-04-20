@@ -10,7 +10,6 @@ from homeassistant.components.sensor import SensorStateClass
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import ATTR_DB_PATH
 from .const import DOMAIN
 from .const import NAME
 
@@ -67,9 +66,3 @@ class PendingIncomeUpdatedCountSensor(SensorEntity):
     def native_value(self) -> int | None:
         """Return the latest pending income updated count."""
         return self._runtime_data.pending_income_updated_count
-
-    @property
-    def extra_state_attributes(self) -> dict[str, str]:
-        """Return sensor attributes."""
-        db_path = self._runtime_data.db_path or str(self._runtime_data.resolved_db_path)
-        return {ATTR_DB_PATH: db_path}

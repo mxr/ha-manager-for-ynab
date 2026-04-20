@@ -136,19 +136,6 @@ def test_pending_income_sensor_reads_runtime_state() -> None:
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
 
     assert sensor.native_value == 5
-    assert sensor.extra_state_attributes == {"db_path": "/tmp/ynab.sqlite3"}
-
-
-def test_pending_income_sensor_uses_default_db_path_when_config_empty() -> None:
-    runtime_data = RuntimeData(token="token", db_path="")
-
-    with patch(
-        "custom_components.ha_manager_for_ynab.sqlite_default_db_path",
-        return_value=Path("/tmp/default.sqlite3"),
-    ):
-        sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
-
-        assert sensor.extra_state_attributes == {"db_path": "/tmp/default.sqlite3"}
 
 
 def test_sensor_async_added_to_hass_registers_listener() -> None:
@@ -212,7 +199,7 @@ def test_user_schema_uses_default_db_path() -> None:
     default_db_path = Path("/tmp/default.sqlite3")
 
     with patch(
-        "custom_components.ha_manager_for_ynab.config_flow._api.default_db_path",
+        "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
         return_value=default_db_path,
     ):
         assert _user_schema()({"token": "token"}) == {
@@ -224,7 +211,7 @@ def test_user_schema_uses_default_db_path() -> None:
 def test_user_schema_rejects_empty_db_path() -> None:
     with (
         patch(
-            "custom_components.ha_manager_for_ynab.config_flow._api.default_db_path",
+            "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
             return_value=Path("/tmp/default.sqlite3"),
         ),
         pytest.raises(vol.Invalid),
