@@ -1,13 +1,13 @@
 {
-  "domain": "ha_manager_for_ynab",
-  "name": "Manager for YNAB",
   "codeowners": [
     "@mxr"
   ],
   "config_flow": true,
   "documentation": "https://github.com/mxr/ha-manager-for-ynab",
-  "issue_tracker": "https://github.com/mxr/ha-manager-for-ynab/issues",
+  "domain": "ha_manager_for_ynab",
   "integration_type": "service",
+  "issue_tracker": "https://github.com/mxr/ha-manager-for-ynab/issues",
+  "name": "Manager for YNAB",
   "requirements": [
     "manager-for-ynab>=1.1.1",
     "sqlite-export-for-ynab>=2.2.0"

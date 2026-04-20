@@ -1,5 +1,5 @@
 {
-  "name": "Manager for YNAB",
   "content_in_root": false,
-  "homeassistant": "2026.5.0"
+  "homeassistant": "2026.5.0",
+  "name": "Manager for YNAB"
 }
