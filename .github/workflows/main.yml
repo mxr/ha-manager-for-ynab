@@ -6,7 +6,29 @@ on:
     branches: [main]
 
 jobs:
-  pre-commit:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      project_files: ${{ steps.filter.outputs.project_files }}
+      python_files: ${{ steps.filter.outputs.python_files }}
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+    - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      id: filter
+      with:
+        filters: |
+          python_files:
+            - '**/*.py'
+          project_files:
+            - .github/workflows/**
+            - '**/*.py'
+            - '**/*.toml'
+            - '**/*requirements*.txt'
+            - '**/setup.cfg'
+            - tox.ini
+  pre-commit-real:
+    needs: [changes]
+    if: needs.changes.outputs.python_files == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -21,23 +43,18 @@ jobs:
     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
       with:
         extra_args: mypy --all-files  # venv is too large to run with pre-commit.ci
-  changes:
+  pre-commit:
+    needs: [changes, pre-commit-real]
+    if: always()
     runs-on: ubuntu-latest
-    outputs:
-      project_files: ${{ steps.filter.outputs.project_files }}
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-    - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
-      id: filter
-      with:
-        filters: |
-          project_files:
-            - .github/workflows/**
-            - '**/*.py'
-            - '**/*.toml'
-            - '**/*requirements*.txt'
-            - '**/setup.cfg'
-            - tox.ini
+    - run: |
+        if [ "${{ needs.changes.outputs.python_files }}" != "true" ]; then
+          exit 0
+        fi
+        if [ "${{ needs.pre-commit-real.result }}" != "success" ]; then
+          exit 1
+        fi
   main-real:
     needs: [changes]
     if: needs.changes.outputs.project_files == 'true'
