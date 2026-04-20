@@ -5,12 +5,12 @@
     },
     "step": {
       "user": {
-        "title": "Manager for YNAB",
-        "description": "Configure your creds and custom SQLite DB path (if desired).",
         "data": {
-          "token": "YNAB personal access token",
-          "db_path": "SQLite database path (leave as-is for default)"
-        }
+          "db_path": "SQLite database path (leave as-is for default)",
+          "token": "YNAB personal access token"
+        },
+        "description": "Configure your creds and custom SQLite DB path (if desired).",
+        "title": "Manager for YNAB"
       }
     }
   },
@@ -23,32 +23,32 @@
   },
   "services": {
     "pending_income": {
-      "name": "Pending income",
       "description": "Run manager-for-ynab pending income and update the sensor.",
       "fields": {
         "for_real": {
-          "name": "For real",
-          "description": "Apply the transaction date updates instead of running in dry-run mode."
+          "description": "Apply the transaction date updates instead of running in dry-run mode.",
+          "name": "For real"
         },
         "quiet": {
-          "name": "Quiet",
-          "description": "Suppress output from the underlying library."
+          "description": "Suppress output from the underlying library.",
+          "name": "Quiet"
         }
-      }
+      },
+      "name": "Pending income"
     },
     "sqlite_export": {
-      "name": "SQLite export",
       "description": "Run sqlite-export-for-ynab using the configured token and DB path.",
       "fields": {
         "full_refresh": {
-          "name": "Full refresh",
-          "description": "Drop and rebuild the SQLite export instead of performing an incremental sync."
+          "description": "Drop and rebuild the SQLite export instead of performing an incremental sync.",
+          "name": "Full refresh"
         },
         "quiet": {
-          "name": "Quiet",
-          "description": "Suppress output from the underlying library."
+          "description": "Suppress output from the underlying library.",
+          "name": "Quiet"
         }
-      }
+      },
+      "name": "SQLite export"
     }
   }
 }
