@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import voluptuous as vol
-from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, callback
@@ -53,11 +52,6 @@ class RuntimeData:
     db_path: str
     pending_income_updated_count: int | None = None
     _listeners: list[Callable[[], None]] = field(default_factory=list)
-
-    @property
-    def resolved_db_path(self) -> Path:
-        """Return the configured DB path or the library default path."""
-        return Path(self.db_path) if self.db_path else sqlite_default_db_path()
 
     @callback
     def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -121,7 +115,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 partial(
                     _api.run_pending_income,
                     runtime_data.token,
-                    runtime_data.resolved_db_path,
+                    Path(runtime_data.db_path),
                     for_real=call.data["for_real"],
                     quiet=call.data["quiet"],
                 )
@@ -137,7 +131,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         try:
             await _api.run_sqlite_export(
                 runtime_data.token,
-                runtime_data.resolved_db_path,
+                Path(runtime_data.db_path),
                 full_refresh=call.data["full_refresh"],
                 quiet=call.data["quiet"],
             )

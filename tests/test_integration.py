@@ -94,16 +94,6 @@ class FakeHass:
         return func()
 
 
-def test_runtime_data_uses_default_db_path_when_config_empty() -> None:
-    runtime_data = RuntimeData(token="token", db_path="")
-
-    with patch(
-        "custom_components.ha_manager_for_ynab.sqlite_default_db_path",
-        return_value=Path("/tmp/default.sqlite3"),
-    ):
-        assert runtime_data.resolved_db_path == Path("/tmp/default.sqlite3")
-
-
 def test_runtime_data_listener_unsubscribe_path() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     listener = Mock()
