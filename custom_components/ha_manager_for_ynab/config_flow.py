@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
+from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
 
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.config_entries import ConfigFlowResult
 
-from . import _api
 from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
 from .const import DOMAIN
@@ -38,7 +38,7 @@ def _user_schema() -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_TOKEN): str,
-            vol.Optional(CONF_DB_PATH, default=str(_api.default_db_path())): vol.All(
+            vol.Optional(CONF_DB_PATH, default=str(sqlite_default_db_path())): vol.All(
                 str, vol.Length(min=1)
             ),
         }
