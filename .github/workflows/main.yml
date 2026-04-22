@@ -25,6 +25,7 @@ jobs:
             - '**/*.toml'
             - '**/*requirements*.txt'
             - '**/setup.cfg'
+            - custom_components/*/manifest.json
             - tox.ini
   pre-commit-real:
     needs: [changes]
