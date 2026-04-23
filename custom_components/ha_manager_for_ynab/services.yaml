@@ -13,6 +13,21 @@ pending_income:
       selector:
         boolean:
 
+auto_approve:
+  fields:
+    for_real:
+      required: false
+      example: false
+      default: false
+      selector:
+        boolean:
+    quiet:
+      required: false
+      example: false
+      default: false
+      selector:
+        boolean:
+
 sqlite_export:
   fields:
     full_refresh:

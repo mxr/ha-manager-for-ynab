@@ -21,6 +21,7 @@ from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
 from .const import DOMAIN
 from .const import LOGGER
+from .const import SERVICE_AUTO_APPROVE
 from .const import SERVICE_PENDING_INCOME
 from .const import SERVICE_SQLITE_EXPORT
 from .const import SERVICE_SQLITE_QUERY
@@ -34,6 +35,12 @@ if TYPE_CHECKING:
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 PENDING_INCOME_SCHEMA = vol.Schema(
+    {
+        vol.Optional("for_real", default=False): cv.boolean,
+        vol.Optional("quiet", default=False): cv.boolean,
+    }
+)
+AUTO_APPROVE_SCHEMA = vol.Schema(
     {
         vol.Optional("for_real", default=False): cv.boolean,
         vol.Optional("quiet", default=False): cv.boolean,
@@ -135,6 +142,22 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
         runtime_data.async_set_pending_income_updated_count(updated_count)
 
+    async def async_handle_auto_approve(call: ServiceCall) -> None:
+        runtime_data = _get_runtime_data(hass)
+        try:
+            await hass.async_add_executor_job(
+                partial(
+                    _api.run_auto_approve,
+                    runtime_data.token,
+                    Path(runtime_data.db_path),
+                    for_real=call.data["for_real"],
+                    quiet=call.data["quiet"],
+                )
+            )
+        except Exception as err:
+            LOGGER.exception("auto_approve failed")
+            raise HomeAssistantError(f"auto_approve failed: {err}") from err
+
     async def async_handle_sqlite_export(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
@@ -171,6 +194,14 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_PENDING_INCOME,
             async_handle_pending_income,
             schema=PENDING_INCOME_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_AUTO_APPROVE,
+            async_handle_auto_approve,
+            schema=AUTO_APPROVE_SCHEMA,
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT):

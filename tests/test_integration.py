@@ -16,6 +16,7 @@ import pytest
 import voluptuous as vol
 from homeassistant.exceptions import HomeAssistantError
 
+from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
 from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
 from custom_components.ha_manager_for_ynab import SQLITE_QUERY_SCHEMA
 from custom_components.ha_manager_for_ynab import SQLITE_EXPORT_SCHEMA
@@ -28,6 +29,7 @@ from custom_components.ha_manager_for_ynab import async_setup_entry
 from custom_components.ha_manager_for_ynab import async_unload_entry
 from custom_components.ha_manager_for_ynab.config_flow import ManagerForYnabConfigFlow
 from custom_components.ha_manager_for_ynab.config_flow import _user_schema
+from custom_components.ha_manager_for_ynab.const import SERVICE_AUTO_APPROVE
 from custom_components.ha_manager_for_ynab.const import CONF_DB_PATH
 from custom_components.ha_manager_for_ynab.const import CONF_TOKEN
 from custom_components.ha_manager_for_ynab.const import DOMAIN
@@ -193,6 +195,7 @@ def test_sensor_async_setup_entry_adds_entity() -> None:
 
 
 def test_service_schemas_default_false_values() -> None:
+    assert AUTO_APPROVE_SCHEMA({}) == {"for_real": False, "quiet": False}
     assert PENDING_INCOME_SCHEMA({}) == {"for_real": False, "quiet": False}
     assert SQLITE_EXPORT_SCHEMA({}) == {"full_refresh": False, "quiet": False}
     assert SQLITE_QUERY_SCHEMA({"sql": "select 1"}) == {
@@ -237,6 +240,25 @@ def test_api_run_pending_income_returns_updated_count() -> None:
             == 11
         )
         pending_income.assert_called_once_with(
+            db=Path("/tmp/db.sqlite3"),
+            for_real=True,
+            quiet=False,
+            token_override="token",
+        )
+
+
+def test_api_run_auto_approve_returns_updated_count() -> None:
+    with patch(
+        "custom_components.ha_manager_for_ynab._api.auto_approve",
+        MagicMock(return_value=SimpleNamespace(updated_count=9)),
+    ) as auto_approve:
+        assert (
+            _api.run_auto_approve(
+                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+            )
+            == 9
+        )
+        auto_approve.assert_called_once_with(
             db=Path("/tmp/db.sqlite3"),
             for_real=True,
             quiet=False,
@@ -351,6 +373,7 @@ def test_async_setup_registers_services() -> None:
     setup_ok = asyncio.run(async_setup(hass, {}))
 
     assert setup_ok is True
+    assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
     assert hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
@@ -409,6 +432,10 @@ def test_register_services_success_and_idempotence() -> None:
 
     with (
         patch(
+            "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+            return_value=0,
+        ) as run_auto_approve,
+        patch(
             "custom_components.ha_manager_for_ynab._api.run_pending_income",
             return_value=4,
         ),
@@ -430,6 +457,12 @@ def test_register_services_success_and_idempotence() -> None:
                 "handler"
             ],
         )
+        auto_approve = cast(
+            "ServiceHandler",
+            cast("Any", hass).services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)][
+                "handler"
+            ],
+        )
         sqlite_export = cast(
             "ServiceHandler",
             cast("Any", hass).services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)][
@@ -443,6 +476,14 @@ def test_register_services_success_and_idempotence() -> None:
             ],
         )
 
+        asyncio.run(
+            auto_approve(
+                cast(
+                    "ServiceCall",
+                    SimpleNamespace(data={"for_real": True, "quiet": True}),
+                )
+            )
+        )
         asyncio.run(
             pending(
                 cast(
@@ -474,8 +515,14 @@ def test_register_services_success_and_idempotence() -> None:
         )
 
     assert result == {"rows": [{"id": 1}]}
-    assert len(cast("Any", hass).services.registered) == 3
+    assert len(cast("Any", hass).services.registered) == 4
     assert entry.runtime_data.pending_income_updated_count == 4
+    run_auto_approve.assert_called_once_with(
+        "token",
+        Path("/tmp/db.sqlite3"),
+        for_real=True,
+        quiet=True,
+    )
     run_sqlite_export.assert_awaited_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
@@ -497,6 +544,10 @@ def test_register_services_error_paths_raise_home_assistant_error() -> None:
 
     with (
         patch(
+            "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch(
             "custom_components.ha_manager_for_ynab._api.run_pending_income",
             side_effect=RuntimeError("boom"),
         ),
@@ -516,6 +567,12 @@ def test_register_services_error_paths_raise_home_assistant_error() -> None:
                 "handler"
             ],
         )
+        auto_approve = cast(
+            "ServiceHandler",
+            cast("Any", hass).services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)][
+                "handler"
+            ],
+        )
         sqlite_export = cast(
             "ServiceHandler",
             cast("Any", hass).services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)][
@@ -528,6 +585,16 @@ def test_register_services_error_paths_raise_home_assistant_error() -> None:
                 "handler"
             ],
         )
+
+        with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
+            asyncio.run(
+                auto_approve(
+                    cast(
+                        "ServiceCall",
+                        SimpleNamespace(data={"for_real": False, "quiet": False}),
+                    )
+                )
+            )
 
         with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
             asyncio.run(

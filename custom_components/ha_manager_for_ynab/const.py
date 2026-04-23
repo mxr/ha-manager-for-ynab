@@ -17,6 +17,7 @@ ATTR_OUTPUT_FORMAT: Final = "output_format"
 ATTR_SQL: Final = "sql"
 
 SERVICE_PENDING_INCOME: Final = "pending_income"
+SERVICE_AUTO_APPROVE: Final = "auto_approve"
 SERVICE_SQLITE_EXPORT: Final = "sqlite_export"
 SERVICE_SQLITE_QUERY: Final = "sqlite_query"
 
