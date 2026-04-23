@@ -10,17 +10,20 @@ from typing import TYPE_CHECKING
 import voluptuous as vol
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from . import _api
+from .const import ATTR_OUTPUT_FORMAT
+from .const import ATTR_SQL
 from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
 from .const import DOMAIN
 from .const import LOGGER
 from .const import SERVICE_PENDING_INCOME
 from .const import SERVICE_SQLITE_EXPORT
+from .const import SERVICE_SQLITE_QUERY
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,6 +43,12 @@ SQLITE_EXPORT_SCHEMA = vol.Schema(
     {
         vol.Optional("full_refresh", default=False): cv.boolean,
         vol.Optional("quiet", default=False): cv.boolean,
+    }
+)
+SQLITE_QUERY_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_SQL): cv.string,
+        vol.Optional(ATTR_OUTPUT_FORMAT, default="json"): vol.In(("json", "csv")),
     }
 )
 
@@ -139,6 +148,23 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("sqlite_export failed")
             raise HomeAssistantError(f"sqlite_export failed: {err}") from err
 
+    async def async_handle_sqlite_query(call: ServiceCall) -> dict[str, object]:
+        runtime_data = _get_runtime_data(hass)
+        try:
+            result = await hass.async_add_executor_job(
+                partial(
+                    _api.run_sql_query,
+                    Path(runtime_data.db_path),
+                    call.data[ATTR_SQL],
+                    output_format=call.data[ATTR_OUTPUT_FORMAT],
+                )
+            )
+        except Exception as err:
+            LOGGER.exception("sqlite_query failed")
+            raise HomeAssistantError(f"sqlite_query failed: {err}") from err
+
+        return result
+
     if not hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME):
         hass.services.async_register(
             DOMAIN,
@@ -153,6 +179,15 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_SQLITE_EXPORT,
             async_handle_sqlite_export,
             schema=SQLITE_EXPORT_SCHEMA,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SQLITE_QUERY,
+            async_handle_sqlite_query,
+            schema=SQLITE_QUERY_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
         )
 
 

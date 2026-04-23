@@ -27,3 +27,21 @@ sqlite_export:
       default: false
       selector:
         boolean:
+
+sqlite_query:
+  fields:
+    sql:
+      required: true
+      example: SELECT * FROM budgets LIMIT 10
+      selector:
+        text:
+          multiline: true
+    output_format:
+      required: false
+      example: json
+      default: json
+      selector:
+        select:
+          options:
+          - json
+          - csv
