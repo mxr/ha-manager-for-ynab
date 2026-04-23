@@ -9,7 +9,7 @@
   "issue_tracker": "https://github.com/mxr/ha-manager-for-ynab/issues",
   "name": "Manager for YNAB",
   "requirements": [
-    "manager-for-ynab>=1.2.0",
+    "manager-for-ynab>=1.3.0",
     "sqlite-export-for-ynab>=2.2.0"
   ],
   "version": "0.1.2"
