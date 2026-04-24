@@ -228,43 +228,58 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
 
 
 @patch(
-    "custom_components.ha_manager_for_ynab._api.pending_income",
+    "custom_components.ha_manager_for_ynab._api._run_pending_income_after_refresh",
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
-def test_api_run_pending_income_returns_updated_count(pending_income: Mock) -> None:
+@patch(
+    "custom_components.ha_manager_for_ynab._api.sqlite_export_sync",
+    new_callable=AsyncMock,
+)
+def test_api_run_pending_income_returns_updated_count(
+    sqlite_export_sync: AsyncMock,
+    pending_income_after_refresh: Mock,
+) -> None:
     assert (
-        _api.run_pending_income(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        asyncio.run(
+            _api.run_pending_income(
+                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+            )
         )
         == 11
     )
-    pending_income.assert_called_once_with(
-        db=Path("/tmp/db.sqlite3"),
-        full_refresh=False,
-        for_real=True,
-        skip_matched=False,
-        quiet=False,
-        token_override="token",
+    sqlite_export_sync.assert_awaited_once_with(
+        "token", Path("/tmp/db.sqlite3"), False, quiet=False
+    )
+    pending_income_after_refresh.assert_called_once_with(
+        "token", Path("/tmp/db.sqlite3"), True, False
     )
 
 
 @patch(
-    "custom_components.ha_manager_for_ynab._api.auto_approve",
+    "custom_components.ha_manager_for_ynab._api._run_auto_approve_after_refresh",
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
-def test_api_run_auto_approve_returns_updated_count(auto_approve: Mock) -> None:
+@patch(
+    "custom_components.ha_manager_for_ynab._api.sqlite_export_sync",
+    new_callable=AsyncMock,
+)
+def test_api_run_auto_approve_returns_updated_count(
+    sqlite_export_sync: AsyncMock,
+    auto_approve_after_refresh: Mock,
+) -> None:
     assert (
-        _api.run_auto_approve(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        asyncio.run(
+            _api.run_auto_approve(
+                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+            )
         )
         == 9
     )
-    auto_approve.assert_called_once_with(
-        db=Path("/tmp/db.sqlite3"),
-        full_refresh=False,
-        for_real=True,
-        quiet=False,
-        token_override="token",
+    sqlite_export_sync.assert_awaited_once_with(
+        "token", Path("/tmp/db.sqlite3"), False, quiet=False
+    )
+    auto_approve_after_refresh.assert_called_once_with(
+        "token", Path("/tmp/db.sqlite3"), True, False
     )
 
 
@@ -453,7 +468,6 @@ def test_register_services_success_and_idempotence(
     run_sql_query: Mock,
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
-    del run_pending_income
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     runtime_data = RuntimeData(token="token", db_path="/tmp/db.sqlite3")
@@ -499,7 +513,13 @@ def test_register_services_success_and_idempotence(
     assert result == {"rows": [{"id": 1}]}
     assert len(fake_hass.services.registered) == 4
     assert entry.runtime_data.pending_income_updated_count == 4
-    run_auto_approve.assert_called_once_with(
+    run_auto_approve.assert_awaited_once_with(
+        "token",
+        Path("/tmp/db.sqlite3"),
+        for_real=True,
+        quiet=True,
+    )
+    run_pending_income.assert_awaited_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
