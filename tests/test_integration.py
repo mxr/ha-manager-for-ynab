@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -48,11 +49,10 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import CALLBACK_TYPE
     from homeassistant.core import HomeAssistant
-    from homeassistant.core import ServiceCall
     from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-    ServiceHandler = Callable[[ServiceCall], Coroutine[Any, Any, object | None]]
+    ServiceHandler = Callable[[object], Coroutine[Any, Any, object | None]]
 
 
 class FakeServices:
@@ -106,6 +106,11 @@ class FakeHass:
     async def async_add_executor_job(self, func: Callable[[], object]) -> object:
         self.executor_jobs.append(func)
         return func()
+
+
+@dataclass
+class FakeServiceCall:
+    data: dict[str, object]
 
 
 def test_runtime_data_listener_unsubscribe_path() -> None:
@@ -368,7 +373,8 @@ def test_config_flow_user_creates_entry() -> None:
 
 
 def test_async_setup_registers_services() -> None:
-    hass = cast("HomeAssistant", FakeHass())
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
 
     setup_ok = asyncio.run(async_setup(hass, {}))
 
@@ -380,7 +386,8 @@ def test_async_setup_registers_services() -> None:
 
 
 def test_async_setup_and_unload_entry() -> None:
-    hass = cast("HomeAssistant", FakeHass())
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
     entry = cast(
         "ConfigEntry[RuntimeData]",
         SimpleNamespace(
@@ -394,37 +401,40 @@ def test_async_setup_and_unload_entry() -> None:
 
     assert unload_ok is True
     assert entry.runtime_data.token == "token"
-    assert cast("FakeHass", hass).data[DOMAIN] == {}
+    assert fake_hass.data[DOMAIN] == {}
 
 
 def test_async_unload_entry_false_does_not_remove_services() -> None:
-    hass = cast("HomeAssistant", FakeHass())
-    cast("Any", hass).config_entries.unload_result = False
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
+    fake_hass.config_entries.unload_result = False
     entry = cast(
         "ConfigEntry[RuntimeData]",
         SimpleNamespace(
             entry_id="entry-1", runtime_data=RuntimeData(token="token", db_path="")
         ),
     )
-    cast("FakeHass", hass).data[DOMAIN] = {"entry-1": entry.runtime_data}
+    fake_hass.data[DOMAIN] = {"entry-1": entry.runtime_data}
 
     unload_ok = asyncio.run(async_unload_entry(hass, entry))
 
     assert unload_ok is False
-    assert cast("FakeHass", hass).data[DOMAIN] == {"entry-1": entry.runtime_data}
+    assert fake_hass.data[DOMAIN] == {"entry-1": entry.runtime_data}
 
 
 def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
-    hass = cast("HomeAssistant", FakeHass())
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
 
     with pytest.raises(HomeAssistantError, match="Manager for YNAB is not configured"):
         _get_runtime_data(hass)
 
 
 def test_register_services_success_and_idempotence() -> None:
-    hass = cast("HomeAssistant", FakeHass())
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
     runtime_data = RuntimeData(token="token", db_path="/tmp/db.sqlite3")
-    cast("FakeHass", hass).data[DOMAIN] = {"entry-1": runtime_data}
+    fake_hass.data[DOMAIN] = {"entry-1": runtime_data}
     entry = cast(
         "ConfigEntry[RuntimeData]",
         SimpleNamespace(runtime_data=runtime_data),
@@ -453,69 +463,41 @@ def test_register_services_success_and_idempotence() -> None:
 
         pending = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_PENDING_INCOME)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
         )
         auto_approve = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
         )
         sqlite_export = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
         )
         sqlite_query = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
         )
 
         asyncio.run(
-            auto_approve(
-                cast(
-                    "ServiceCall",
-                    SimpleNamespace(data={"for_real": True, "quiet": True}),
-                )
-            )
+            auto_approve(FakeServiceCall(data={"for_real": True, "quiet": True}))
         )
+        asyncio.run(pending(FakeServiceCall(data={"for_real": True, "quiet": True})))
         asyncio.run(
-            pending(
-                cast(
-                    "ServiceCall",
-                    SimpleNamespace(data={"for_real": True, "quiet": True}),
-                )
-            )
-        )
-        asyncio.run(
-            sqlite_export(
-                cast(
-                    "ServiceCall",
-                    SimpleNamespace(data={"full_refresh": True, "quiet": False}),
-                )
-            )
+            sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
         )
         result = asyncio.run(
             sqlite_query(
-                cast(
-                    "ServiceCall",
-                    SimpleNamespace(
-                        data={
-                            "sql": "select 1",
-                            "output_format": "csv",
-                        }
-                    ),
+                FakeServiceCall(
+                    data={
+                        "sql": "select 1",
+                        "output_format": "csv",
+                    }
                 )
             )
         )
 
     assert result == {"rows": [{"id": 1}]}
-    assert len(cast("Any", hass).services.registered) == 4
+    assert len(fake_hass.services.registered) == 4
     assert entry.runtime_data.pending_income_updated_count == 4
     run_auto_approve.assert_called_once_with(
         "token",
@@ -537,8 +519,9 @@ def test_register_services_success_and_idempotence() -> None:
 
 
 def test_register_services_error_paths_raise_home_assistant_error() -> None:
-    hass = cast("HomeAssistant", FakeHass())
-    cast("FakeHass", hass).data[DOMAIN] = {
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
+    fake_hass.data[DOMAIN] = {
         "entry-1": RuntimeData(token="token", db_path="/tmp/db.sqlite3")
     }
 
@@ -563,67 +546,41 @@ def test_register_services_error_paths_raise_home_assistant_error() -> None:
         asyncio.run(_async_register_services(hass))
         pending = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_PENDING_INCOME)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
         )
         auto_approve = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
         )
         sqlite_export = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
         )
         sqlite_query = cast(
             "ServiceHandler",
-            cast("Any", hass).services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)][
-                "handler"
-            ],
+            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
         )
 
         with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
             asyncio.run(
-                auto_approve(
-                    cast(
-                        "ServiceCall",
-                        SimpleNamespace(data={"for_real": False, "quiet": False}),
-                    )
-                )
+                auto_approve(FakeServiceCall(data={"for_real": False, "quiet": False}))
             )
 
         with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
             asyncio.run(
-                pending(
-                    cast(
-                        "ServiceCall",
-                        SimpleNamespace(data={"for_real": False, "quiet": False}),
-                    )
-                )
+                pending(FakeServiceCall(data={"for_real": False, "quiet": False}))
             )
 
         with pytest.raises(HomeAssistantError, match="sqlite_export failed: boom"):
             asyncio.run(
                 sqlite_export(
-                    cast(
-                        "ServiceCall",
-                        SimpleNamespace(data={"full_refresh": False, "quiet": False}),
-                    )
+                    FakeServiceCall(data={"full_refresh": False, "quiet": False})
                 )
             )
 
         with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
             asyncio.run(
                 sqlite_query(
-                    cast(
-                        "ServiceCall",
-                        SimpleNamespace(
-                            data={"sql": "select 1", "output_format": "json"}
-                        ),
-                    )
+                    FakeServiceCall(data={"sql": "select 1", "output_format": "json"})
                 )
             )
