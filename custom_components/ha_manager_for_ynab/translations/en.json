@@ -22,6 +22,20 @@
     }
   },
   "services": {
+    "auto_approve": {
+      "description": "Run manager-for-ynab auto approve.",
+      "fields": {
+        "for_real": {
+          "description": "Approve the matched transactions instead of running in dry-run mode.",
+          "name": "For real"
+        },
+        "quiet": {
+          "description": "Suppress output from the underlying library.",
+          "name": "Quiet"
+        }
+      },
+      "name": "Auto approve"
+    },
     "pending_income": {
       "description": "Run manager-for-ynab pending income and update the sensor.",
       "fields": {

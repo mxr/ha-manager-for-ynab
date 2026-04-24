@@ -6,6 +6,7 @@ Manager for YNAB is a Home Assistant custom integration for running `manager-for
 
 - Config flow for a YNAB personal access token
 - Optional SQLite DB path configuration
+- `auto_approve` action with `for_real` and `quiet`
 - `pending_income` action with `for_real` and `quiet`
 - `sqlite_export` action with `full_refresh` and `quiet`
 - `sqlite_query` action with arbitrary SQL and `json` or `csv` output
@@ -40,6 +41,13 @@ Leave the DB path empty to use the default path from `sqlite-export-for-ynab`.
 - `quiet`: default `false`
 
 This runs `manager-for-ynab.pending_income.pending_income(...)` and updates the sensor to the returned `updated_count`.
+
+### `auto_approve`
+
+- `for_real`: default `false`
+- `quiet`: default `false`
+
+This runs `manager-for-ynab.auto_approve.auto_approve(...)`.
 
 ### `sqlite_export`
 

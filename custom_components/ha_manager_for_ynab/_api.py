@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from manager_for_ynab.auto_approve import auto_approve
 from manager_for_ynab.pending_income import pending_income
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
 
@@ -31,6 +32,15 @@ def run_pending_income(
     """Run pending income and return the updated transaction count."""
 
     result = pending_income(
+        db=db_path, for_real=for_real, quiet=quiet, token_override=token
+    )
+    return result.updated_count
+
+
+def run_auto_approve(token: str, db_path: Path, *, for_real: bool, quiet: bool) -> int:
+    """Run auto approve and return the updated transaction count."""
+
+    result = auto_approve(
         db=db_path, for_real=for_real, quiet=quiet, token_override=token
     )
     return result.updated_count
