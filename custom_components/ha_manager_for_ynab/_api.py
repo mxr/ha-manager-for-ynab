@@ -32,7 +32,12 @@ def run_pending_income(
     """Run pending income and return the updated transaction count."""
 
     result = pending_income(
-        db=db_path, for_real=for_real, quiet=quiet, token_override=token
+        db=db_path,
+        full_refresh=False,
+        for_real=for_real,
+        skip_matched=False,
+        quiet=quiet,
+        token_override=token,
     )
     return result.updated_count
 
@@ -41,7 +46,11 @@ def run_auto_approve(token: str, db_path: Path, *, for_real: bool, quiet: bool) 
     """Run auto approve and return the updated transaction count."""
 
     result = auto_approve(
-        db=db_path, for_real=for_real, quiet=quiet, token_override=token
+        db=db_path,
+        full_refresh=False,
+        for_real=for_real,
+        quiet=quiet,
+        token_override=token,
     )
     return result.updated_count
 
