@@ -42,8 +42,7 @@ from custom_components.ha_manager_for_ynab.sensor import PendingIncomeUpdatedCou
 from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
 )
-
-pytest_plugins = ("testing.fixtures",)
+from fixtures import config_entry_factory as config_entry_factory
 
 if TYPE_CHECKING:
     from collections.abc import Callable
