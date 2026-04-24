@@ -4,7 +4,6 @@ import asyncio
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 from typing import TYPE_CHECKING
 from typing import cast
@@ -16,6 +15,8 @@ from unittest.mock import patch
 import pytest
 import voluptuous as vol
 from homeassistant.exceptions import HomeAssistantError
+from manager_for_ynab.auto_approve import AutoApproveResult
+from manager_for_ynab.pending_income import PendingIncomeResult
 
 from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
 from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
@@ -42,12 +43,13 @@ from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
 )
 
+pytest_plugins = ("testing.fixtures",)
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from collections.abc import Coroutine
 
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import CALLBACK_TYPE
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -147,36 +149,31 @@ def test_pending_income_sensor_reads_runtime_state() -> None:
     assert sensor.native_value == 5
 
 
-def test_sensor_async_added_to_hass_registers_listener() -> None:
+@patch.object(PendingIncomeUpdatedCountSensor, "async_write_ha_state", autospec=True)
+@patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
+def test_sensor_async_added_to_hass_registers_listener(
+    async_on_remove: Mock,
+    async_write_ha_state: Mock,
+) -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
-    removers: list[CALLBACK_TYPE] = []
-    writes: list[str] = []
-
-    def fake_async_on_remove(func: CALLBACK_TYPE) -> None:
-        removers.append(func)
-
-    sensor_any = cast("Any", sensor)
-    sensor_any.async_on_remove = fake_async_on_remove
-    sensor_any.async_write_ha_state = lambda: writes.append("write")
 
     asyncio.run(sensor.async_added_to_hass())
-    unsubscribe = removers[0]
+    async_on_remove.assert_called_once()
+    unsubscribe = async_on_remove.call_args.args[1]
+
     runtime_data.async_set_pending_income_updated_count(2)
     unsubscribe()
     runtime_data.async_set_pending_income_updated_count(3)
 
-    assert len(writes) == 1
+    async_write_ha_state.assert_called_once_with(sensor)
 
 
-def test_sensor_async_setup_entry_adds_entity() -> None:
+def test_sensor_async_setup_entry_adds_entity(
+    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+) -> None:
     added: list[Entity] = []
-    entry = cast(
-        "ConfigEntry[RuntimeData]",
-        SimpleNamespace(
-            runtime_data=RuntimeData(token="token", db_path=""), entry_id="entry-1"
-        ),
-    )
+    entry = config_entry_factory(runtime_data=RuntimeData(token="token", db_path=""))
 
     def add_entities(
         new_entities: list[Entity],
@@ -209,84 +206,81 @@ def test_service_schemas_default_false_values() -> None:
     }
 
 
-def test_user_schema_uses_default_db_path() -> None:
+@patch("custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path")
+def test_user_schema_uses_default_db_path(sqlite_default_db_path: Mock) -> None:
     default_db_path = Path("/tmp/default.sqlite3")
+    sqlite_default_db_path.return_value = default_db_path
 
-    with patch(
-        "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
-        return_value=default_db_path,
-    ):
-        assert _user_schema()({"token": "token"}) == {
-            "token": "token",
-            "db_path": str(default_db_path),
-        }
+    assert _user_schema()({"token": "token"}) == {
+        "token": "token",
+        "db_path": str(default_db_path),
+    }
 
 
-def test_user_schema_rejects_empty_db_path() -> None:
-    with (
-        patch(
-            "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
-            return_value=Path("/tmp/default.sqlite3"),
-        ),
-        pytest.raises(vol.Invalid),
-    ):
+@patch(
+    "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
+    return_value=Path("/tmp/default.sqlite3"),
+)
+def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None:
+    del sqlite_default_db_path
+
+    with pytest.raises(vol.Invalid):
         _user_schema()({"token": "token", "db_path": ""})
 
 
-def test_api_run_pending_income_returns_updated_count() -> None:
-    with patch(
-        "custom_components.ha_manager_for_ynab._api.pending_income",
-        MagicMock(return_value=SimpleNamespace(updated_count=11)),
-    ) as pending_income:
-        assert (
-            _api.run_pending_income(
-                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-            )
-            == 11
+@patch(
+    "custom_components.ha_manager_for_ynab._api.pending_income",
+    return_value=PendingIncomeResult(transactions=[], updated_count=11),
+)
+def test_api_run_pending_income_returns_updated_count(pending_income: Mock) -> None:
+    assert (
+        _api.run_pending_income(
+            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
-        pending_income.assert_called_once_with(
-            db=Path("/tmp/db.sqlite3"),
-            for_real=True,
+        == 11
+    )
+    pending_income.assert_called_once_with(
+        db=Path("/tmp/db.sqlite3"),
+        for_real=True,
+        quiet=False,
+        token_override="token",
+    )
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.auto_approve",
+    return_value=AutoApproveResult(transactions=[], updated_count=9),
+)
+def test_api_run_auto_approve_returns_updated_count(auto_approve: Mock) -> None:
+    assert (
+        _api.run_auto_approve(
+            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        )
+        == 9
+    )
+    auto_approve.assert_called_once_with(
+        db=Path("/tmp/db.sqlite3"),
+        for_real=True,
+        quiet=False,
+        token_override="token",
+    )
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.sqlite_export_sync",
+    new_callable=AsyncMock,
+)
+def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
+    asyncio.run(
+        _api.run_sqlite_export(
+            "token",
+            Path("/tmp/db.sqlite3"),
+            full_refresh=True,
             quiet=False,
-            token_override="token",
         )
+    )
 
-
-def test_api_run_auto_approve_returns_updated_count() -> None:
-    with patch(
-        "custom_components.ha_manager_for_ynab._api.auto_approve",
-        MagicMock(return_value=SimpleNamespace(updated_count=9)),
-    ) as auto_approve:
-        assert (
-            _api.run_auto_approve(
-                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-            )
-            == 9
-        )
-        auto_approve.assert_called_once_with(
-            db=Path("/tmp/db.sqlite3"),
-            for_real=True,
-            quiet=False,
-            token_override="token",
-        )
-
-
-def test_api_run_sqlite_export_delegates() -> None:
-    fake_sync = AsyncMock()
-
-    with patch(
-        "custom_components.ha_manager_for_ynab._api.sqlite_export_sync", fake_sync
-    ):
-        asyncio.run(
-            _api.run_sqlite_export(
-                "token",
-                Path("/tmp/db.sqlite3"),
-                full_refresh=True,
-                quiet=False,
-            )
-        )
-
-    fake_sync.assert_awaited_once_with(
+    sqlite_export_sync.assert_awaited_once_with(
         "token", Path("/tmp/db.sqlite3"), True, quiet=False
     )
 
@@ -341,32 +335,48 @@ def test_api_run_sql_query_write(tmp_path: Path) -> None:
         assert connection.execute("select count(*) from budgets").fetchone() == (0,)
 
 
-def test_config_flow_user_shows_form() -> None:
+@patch.object(
+    ManagerForYnabConfigFlow,
+    "async_show_form",
+    autospec=True,
+    return_value={"type": "form"},
+)
+def test_config_flow_user_shows_form(async_show_form: MagicMock) -> None:
     flow = ManagerForYnabConfigFlow()
-    flow_any = cast("Any", flow)
-    flow_any.async_show_form = MagicMock(return_value={"type": "form"})
 
     result = asyncio.run(flow.async_step_user())
 
     assert result == {"type": "form"}
-    flow_any.async_show_form.assert_called_once()
+    async_show_form.assert_called_once()
+    assert async_show_form.call_args.args == (flow,)
+    assert async_show_form.call_args.kwargs["step_id"] == "user"
+    assert "data_schema" in async_show_form.call_args.kwargs
 
 
-def test_config_flow_user_creates_entry() -> None:
+@patch.object(
+    ManagerForYnabConfigFlow,
+    "async_create_entry",
+    autospec=True,
+    return_value={"type": "create_entry"},
+)
+@patch.object(ManagerForYnabConfigFlow, "_abort_if_unique_id_configured", autospec=True)
+@patch.object(ManagerForYnabConfigFlow, "async_set_unique_id", autospec=True)
+def test_config_flow_user_creates_entry(
+    async_set_unique_id: AsyncMock,
+    abort_if_unique_id_configured: MagicMock,
+    async_create_entry: MagicMock,
+) -> None:
     flow = ManagerForYnabConfigFlow()
-    flow_any = cast("Any", flow)
-    flow_any.async_set_unique_id = AsyncMock()
-    flow_any._abort_if_unique_id_configured = MagicMock()
-    flow_any.async_create_entry = MagicMock(return_value={"type": "create_entry"})
 
     result = asyncio.run(
         flow.async_step_user({"token": "token", "db_path": "/tmp/ynab.sqlite3"})
     )
 
     assert result == {"type": "create_entry"}
-    flow_any.async_set_unique_id.assert_awaited_once_with(DOMAIN)
-    flow_any._abort_if_unique_id_configured.assert_called_once_with()
-    flow_any.async_create_entry.assert_called_once_with(
+    async_set_unique_id.assert_awaited_once_with(flow, DOMAIN)
+    abort_if_unique_id_configured.assert_called_once_with(flow)
+    async_create_entry.assert_called_once_with(
+        flow,
         title="Manager for YNAB",
         data={"token": "token", "db_path": "/tmp/ynab.sqlite3"},
     )
@@ -385,15 +395,12 @@ def test_async_setup_registers_services() -> None:
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
 
-def test_async_setup_and_unload_entry() -> None:
+def test_async_setup_and_unload_entry(
+    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+) -> None:
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
-    entry = cast(
-        "ConfigEntry[RuntimeData]",
-        SimpleNamespace(
-            entry_id="entry-1", data={CONF_TOKEN: "token", CONF_DB_PATH: ""}
-        ),
-    )
+    entry = config_entry_factory(data={CONF_TOKEN: "token", CONF_DB_PATH: ""})
 
     asyncio.run(async_setup(hass, {}))
     asyncio.run(async_setup_entry(hass, entry))
@@ -404,16 +411,13 @@ def test_async_setup_and_unload_entry() -> None:
     assert fake_hass.data[DOMAIN] == {}
 
 
-def test_async_unload_entry_false_does_not_remove_services() -> None:
+def test_async_unload_entry_false_does_not_remove_services(
+    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+) -> None:
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     fake_hass.config_entries.unload_result = False
-    entry = cast(
-        "ConfigEntry[RuntimeData]",
-        SimpleNamespace(
-            entry_id="entry-1", runtime_data=RuntimeData(token="token", db_path="")
-        ),
-    )
+    entry = config_entry_factory(runtime_data=RuntimeData(token="token", db_path=""))
     fake_hass.data[DOMAIN] = {"entry-1": entry.runtime_data}
 
     unload_ok = asyncio.run(async_unload_entry(hass, entry))
@@ -430,71 +434,65 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
         _get_runtime_data(hass)
 
 
-def test_register_services_success_and_idempotence() -> None:
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_sql_query",
+    return_value={"rows": [{"id": 1}]},
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
+    new_callable=AsyncMock,
+)
+@patch("custom_components.ha_manager_for_ynab._api.run_pending_income", return_value=4)
+@patch("custom_components.ha_manager_for_ynab._api.run_auto_approve", return_value=0)
+def test_register_services_success_and_idempotence(
+    run_auto_approve: Mock,
+    run_pending_income: Mock,
+    run_sqlite_export: AsyncMock,
+    run_sql_query: Mock,
+    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+) -> None:
+    del run_pending_income
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     runtime_data = RuntimeData(token="token", db_path="/tmp/db.sqlite3")
     fake_hass.data[DOMAIN] = {"entry-1": runtime_data}
-    entry = cast(
-        "ConfigEntry[RuntimeData]",
-        SimpleNamespace(runtime_data=runtime_data),
+    entry = config_entry_factory(runtime_data=runtime_data)
+
+    asyncio.run(_async_register_services(hass))
+    asyncio.run(_async_register_services(hass))
+
+    pending = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
+    )
+    auto_approve = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
+    )
+    sqlite_export = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
+    )
+    sqlite_query = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
     )
 
-    with (
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-            return_value=0,
-        ) as run_auto_approve,
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_pending_income",
-            return_value=4,
-        ),
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
-            new=AsyncMock(),
-        ) as run_sqlite_export,
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_sql_query",
-            return_value={"rows": [{"id": 1}]},
-        ) as run_sql_query,
-    ):
-        asyncio.run(_async_register_services(hass))
-        asyncio.run(_async_register_services(hass))
-
-        pending = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
-        )
-        auto_approve = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
-        )
-        sqlite_export = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
-        )
-        sqlite_query = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
-        )
-
-        asyncio.run(
-            auto_approve(FakeServiceCall(data={"for_real": True, "quiet": True}))
-        )
-        asyncio.run(pending(FakeServiceCall(data={"for_real": True, "quiet": True})))
-        asyncio.run(
-            sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
-        )
-        result = asyncio.run(
-            sqlite_query(
-                FakeServiceCall(
-                    data={
-                        "sql": "select 1",
-                        "output_format": "csv",
-                    }
-                )
+    asyncio.run(auto_approve(FakeServiceCall(data={"for_real": True, "quiet": True})))
+    asyncio.run(pending(FakeServiceCall(data={"for_real": True, "quiet": True})))
+    asyncio.run(
+        sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
+    )
+    result = asyncio.run(
+        sqlite_query(
+            FakeServiceCall(
+                data={
+                    "sql": "select 1",
+                    "output_format": "csv",
+                }
             )
         )
+    )
 
     assert result == {"rows": [{"id": 1}]}
     assert len(fake_hass.services.registered) == 4
@@ -518,69 +516,69 @@ def test_register_services_success_and_idempotence() -> None:
     )
 
 
-def test_register_services_error_paths_raise_home_assistant_error() -> None:
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_sql_query",
+    side_effect=RuntimeError("boom"),
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
+    side_effect=RuntimeError("boom"),
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_pending_income",
+    side_effect=RuntimeError("boom"),
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+    side_effect=RuntimeError("boom"),
+)
+def test_register_services_error_paths_raise_home_assistant_error(
+    run_auto_approve: Mock,
+    run_pending_income: Mock,
+    run_sqlite_export: Mock,
+    run_sql_query: Mock,
+) -> None:
+    del run_auto_approve, run_pending_income, run_sqlite_export, run_sql_query
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     fake_hass.data[DOMAIN] = {
         "entry-1": RuntimeData(token="token", db_path="/tmp/db.sqlite3")
     }
 
-    with (
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-            side_effect=RuntimeError("boom"),
-        ),
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_pending_income",
-            side_effect=RuntimeError("boom"),
-        ),
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
-            side_effect=RuntimeError("boom"),
-        ),
-        patch(
-            "custom_components.ha_manager_for_ynab._api.run_sql_query",
-            side_effect=RuntimeError("boom"),
-        ),
-    ):
-        asyncio.run(_async_register_services(hass))
-        pending = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
-        )
-        auto_approve = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
-        )
-        sqlite_export = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
-        )
-        sqlite_query = cast(
-            "ServiceHandler",
-            fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
+    asyncio.run(_async_register_services(hass))
+    pending = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
+    )
+    auto_approve = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
+    )
+    sqlite_export = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
+    )
+    sqlite_query = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
+    )
+
+    with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
+        asyncio.run(
+            auto_approve(FakeServiceCall(data={"for_real": False, "quiet": False}))
         )
 
-        with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
-            asyncio.run(
-                auto_approve(FakeServiceCall(data={"for_real": False, "quiet": False}))
-            )
+    with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
+        asyncio.run(pending(FakeServiceCall(data={"for_real": False, "quiet": False})))
 
-        with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
-            asyncio.run(
-                pending(FakeServiceCall(data={"for_real": False, "quiet": False}))
-            )
+    with pytest.raises(HomeAssistantError, match="sqlite_export failed: boom"):
+        asyncio.run(
+            sqlite_export(FakeServiceCall(data={"full_refresh": False, "quiet": False}))
+        )
 
-        with pytest.raises(HomeAssistantError, match="sqlite_export failed: boom"):
-            asyncio.run(
-                sqlite_export(
-                    FakeServiceCall(data={"full_refresh": False, "quiet": False})
-                )
+    with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
+        asyncio.run(
+            sqlite_query(
+                FakeServiceCall(data={"sql": "select 1", "output_format": "json"})
             )
-
-        with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
-            asyncio.run(
-                sqlite_query(
-                    FakeServiceCall(data={"sql": "select 1", "output_format": "json"})
-                )
-            )
+        )
