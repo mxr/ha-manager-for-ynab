@@ -36,20 +36,20 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 PENDING_INCOME_SCHEMA = vol.Schema(
     {
-        vol.Optional("for_real", default=False): cv.boolean,
-        vol.Optional("quiet", default=False): cv.boolean,
+        vol.Required("for_real", default=False): cv.boolean,
+        vol.Required("quiet", default=False): cv.boolean,
     }
 )
 AUTO_APPROVE_SCHEMA = vol.Schema(
     {
-        vol.Optional("for_real", default=False): cv.boolean,
-        vol.Optional("quiet", default=False): cv.boolean,
+        vol.Required("for_real", default=False): cv.boolean,
+        vol.Required("quiet", default=False): cv.boolean,
     }
 )
 SQLITE_EXPORT_SCHEMA = vol.Schema(
     {
-        vol.Optional("full_refresh", default=False): cv.boolean,
-        vol.Optional("quiet", default=False): cv.boolean,
+        vol.Required("full_refresh", default=False): cv.boolean,
+        vol.Required("quiet", default=False): cv.boolean,
     }
 )
 SQLITE_QUERY_SCHEMA = vol.Schema(

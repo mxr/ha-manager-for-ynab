@@ -1,13 +1,13 @@
 pending_income:
   fields:
     for_real:
-      required: false
+      required: true
       example: false
       default: false
       selector:
         boolean:
     quiet:
-      required: false
+      required: true
       example: false
       default: false
       selector:
@@ -16,13 +16,13 @@ pending_income:
 auto_approve:
   fields:
     for_real:
-      required: false
+      required: true
       example: false
       default: false
       selector:
         boolean:
     quiet:
-      required: false
+      required: true
       example: false
       default: false
       selector:
@@ -31,13 +31,13 @@ auto_approve:
 sqlite_export:
   fields:
     full_refresh:
-      required: false
+      required: true
       example: false
       default: false
       selector:
         boolean:
     quiet:
-      required: false
+      required: true
       example: false
       default: false
       selector:

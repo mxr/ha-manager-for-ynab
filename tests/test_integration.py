@@ -240,7 +240,9 @@ def test_api_run_pending_income_returns_updated_count(pending_income: Mock) -> N
     )
     pending_income.assert_called_once_with(
         db=Path("/tmp/db.sqlite3"),
+        full_refresh=False,
         for_real=True,
+        skip_matched=False,
         quiet=False,
         token_override="token",
     )
@@ -259,6 +261,7 @@ def test_api_run_auto_approve_returns_updated_count(auto_approve: Mock) -> None:
     )
     auto_approve.assert_called_once_with(
         db=Path("/tmp/db.sqlite3"),
+        full_refresh=False,
         for_real=True,
         quiet=False,
         token_override="token",
