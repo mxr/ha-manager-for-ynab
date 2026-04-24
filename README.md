@@ -35,19 +35,19 @@ Leave the DB path empty to use the default path from `sqlite-export-for-ynab`.
 
 ## Actions
 
-### `pending_income`
-
-- `for_real`: default `false`
-- `quiet`: default `false`
-
-This runs `manager-for-ynab.pending_income.pending_income(...)` and updates the sensor to the returned `updated_count`.
-
 ### `auto_approve`
 
 - `for_real`: default `false`
 - `quiet`: default `false`
 
 This runs `manager-for-ynab.auto_approve.auto_approve(...)`.
+
+### `pending_income`
+
+- `for_real`: default `false`
+- `quiet`: default `false`
+
+This runs `manager-for-ynab.pending_income.pending_income(...)` and updates the sensor to the returned `updated_count`.
 
 ### `sqlite_export`
 
