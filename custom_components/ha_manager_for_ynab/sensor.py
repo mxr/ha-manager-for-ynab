@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components.sensor import SensorEntityDescription
 from homeassistant.components.sensor import SensorStateClass
+from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.const import STATE_UNKNOWN
 from homeassistant.helpers.device_registry import DeviceEntryType
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
 from .const import NAME
@@ -39,7 +43,7 @@ async def async_setup_entry(
     )
 
 
-class PendingIncomeUpdatedCountSensor(SensorEntity):
+class PendingIncomeUpdatedCountSensor(RestoreEntity, SensorEntity):
     """Sensor that exposes the last pending income update count."""
 
     entity_description = SENSOR_DESCRIPTION
@@ -58,6 +62,18 @@ class PendingIncomeUpdatedCountSensor(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Register update callback when added."""
+        await super().async_added_to_hass()
+
+        if (
+            self._runtime_data.pending_income_updated_count is None
+            and (last_state := await self.async_get_last_state()) is not None
+            and last_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        ):
+            with suppress(ValueError):
+                self._runtime_data.async_set_pending_income_updated_count(
+                    int(last_state.state)
+                )
+
         self.async_on_remove(
             self._runtime_data.async_add_listener(self.async_write_ha_state)
         )

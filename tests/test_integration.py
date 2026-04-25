@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
+from homeassistant.core import State
 from homeassistant.exceptions import HomeAssistantError
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.pending_income import PendingIncomeResult
@@ -166,6 +167,50 @@ def test_sensor_async_added_to_hass_registers_listener(
     runtime_data.async_set_pending_income_updated_count(3)
 
     async_write_ha_state.assert_called_once_with(sensor)
+
+
+@patch.object(
+    PendingIncomeUpdatedCountSensor,
+    "async_get_last_state",
+    new_callable=AsyncMock,
+    return_value=State("sensor.pending_income_updated_count", "6"),
+)
+@patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
+def test_sensor_async_added_to_hass_restores_last_state(
+    async_on_remove: Mock,
+    async_get_last_state: AsyncMock,
+) -> None:
+    runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
+    sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
+
+    asyncio.run(sensor.async_added_to_hass())
+
+    assert runtime_data.pending_income_updated_count == 6
+    async_get_last_state.assert_awaited_once()
+    async_on_remove.assert_called_once()
+
+
+@patch.object(
+    PendingIncomeUpdatedCountSensor,
+    "async_get_last_state",
+    new_callable=AsyncMock,
+    return_value=State("sensor.pending_income_updated_count", "6"),
+)
+@patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
+def test_sensor_async_added_to_hass_preserves_runtime_state(
+    async_on_remove: Mock,
+    async_get_last_state: AsyncMock,
+) -> None:
+    runtime_data = RuntimeData(
+        token="token", db_path="/tmp/ynab.sqlite3", pending_income_updated_count=2
+    )
+    sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
+
+    asyncio.run(sensor.async_added_to_hass())
+
+    assert runtime_data.pending_income_updated_count == 2
+    async_get_last_state.assert_not_awaited()
+    async_on_remove.assert_called_once()
 
 
 def test_sensor_async_setup_entry_adds_entity(
