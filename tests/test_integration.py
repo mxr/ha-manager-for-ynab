@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -150,14 +149,15 @@ def test_pending_income_sensor_reads_runtime_state() -> None:
 
 @patch.object(PendingIncomeUpdatedCountSensor, "async_write_ha_state", autospec=True)
 @patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
-def test_sensor_async_added_to_hass_registers_listener(
+@pytest.mark.asyncio
+async def test_sensor_async_added_to_hass_registers_listener(
     async_on_remove: Mock,
     async_write_ha_state: Mock,
 ) -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
 
-    asyncio.run(sensor.async_added_to_hass())
+    await sensor.async_added_to_hass()
     async_on_remove.assert_called_once()
     unsubscribe = async_on_remove.call_args.args[1]
 
@@ -168,7 +168,8 @@ def test_sensor_async_added_to_hass_registers_listener(
     async_write_ha_state.assert_called_once_with(sensor)
 
 
-def test_sensor_async_setup_entry_adds_entity(
+@pytest.mark.asyncio
+async def test_sensor_async_setup_entry_adds_entity(
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
     added: list[Entity] = []
@@ -183,12 +184,10 @@ def test_sensor_async_setup_entry_adds_entity(
         del update_before_add, config_subentry_id
         added.extend(new_entities)
 
-    asyncio.run(
-        sensor_async_setup_entry(
-            cast("HomeAssistant", None),
-            entry,
-            cast("AddConfigEntryEntitiesCallback", add_entities),
-        )
+    await sensor_async_setup_entry(
+        cast("HomeAssistant", None),
+        entry,
+        cast("AddConfigEntryEntitiesCallback", add_entities),
     )
 
     assert len(added) == 1
@@ -232,17 +231,15 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
     new_callable=AsyncMock,
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
-def test_api_run_pending_income_returns_updated_count(
+@pytest.mark.asyncio
+async def test_api_run_pending_income_returns_updated_count(
     pending_income: AsyncMock,
 ) -> None:
     assert (
-        asyncio.run(
-            _api.run_pending_income(
-                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-            )
+        await _api.run_pending_income(
+            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
-        == 11
-    )
+    ) == 11
     pending_income.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -258,15 +255,15 @@ def test_api_run_pending_income_returns_updated_count(
     new_callable=AsyncMock,
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
-def test_api_run_auto_approve_returns_updated_count(auto_approve: AsyncMock) -> None:
+@pytest.mark.asyncio
+async def test_api_run_auto_approve_returns_updated_count(
+    auto_approve: AsyncMock,
+) -> None:
     assert (
-        asyncio.run(
-            _api.run_auto_approve(
-                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-            )
+        await _api.run_auto_approve(
+            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
-        == 9
-    )
+    ) == 9
     auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -280,14 +277,13 @@ def test_api_run_auto_approve_returns_updated_count(auto_approve: AsyncMock) -> 
     "custom_components.ha_manager_for_ynab._api.sqlite_export_sync",
     new_callable=AsyncMock,
 )
-def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
-    asyncio.run(
-        _api.run_sqlite_export(
-            "token",
-            Path("/tmp/db.sqlite3"),
-            full_refresh=True,
-            quiet=False,
-        )
+@pytest.mark.asyncio
+async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
+    await _api.run_sqlite_export(
+        "token",
+        Path("/tmp/db.sqlite3"),
+        full_refresh=True,
+        quiet=False,
     )
 
     sqlite_export_sync.assert_awaited_once_with(
@@ -351,10 +347,11 @@ def test_api_run_sql_query_write(tmp_path: Path) -> None:
     autospec=True,
     return_value={"type": "form"},
 )
-def test_config_flow_user_shows_form(async_show_form: MagicMock) -> None:
+@pytest.mark.asyncio
+async def test_config_flow_user_shows_form(async_show_form: MagicMock) -> None:
     flow = ManagerForYnabConfigFlow()
 
-    result = asyncio.run(flow.async_step_user())
+    result = await flow.async_step_user()
 
     assert result == {"type": "form"}
     async_show_form.assert_called_once()
@@ -371,15 +368,16 @@ def test_config_flow_user_shows_form(async_show_form: MagicMock) -> None:
 )
 @patch.object(ManagerForYnabConfigFlow, "_abort_if_unique_id_configured", autospec=True)
 @patch.object(ManagerForYnabConfigFlow, "async_set_unique_id", autospec=True)
-def test_config_flow_user_creates_entry(
+@pytest.mark.asyncio
+async def test_config_flow_user_creates_entry(
     async_set_unique_id: AsyncMock,
     abort_if_unique_id_configured: MagicMock,
     async_create_entry: MagicMock,
 ) -> None:
     flow = ManagerForYnabConfigFlow()
 
-    result = asyncio.run(
-        flow.async_step_user({"token": "token", "db_path": "/tmp/ynab.sqlite3"})
+    result = await flow.async_step_user(
+        {"token": "token", "db_path": "/tmp/ynab.sqlite3"}
     )
 
     assert result == {"type": "create_entry"}
@@ -392,11 +390,12 @@ def test_config_flow_user_creates_entry(
     )
 
 
-def test_async_setup_registers_services() -> None:
+@pytest.mark.asyncio
+async def test_async_setup_registers_services() -> None:
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
 
-    setup_ok = asyncio.run(async_setup(hass, {}))
+    setup_ok = await async_setup(hass, {})
 
     assert setup_ok is True
     assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
@@ -405,23 +404,25 @@ def test_async_setup_registers_services() -> None:
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
 
-def test_async_setup_and_unload_entry(
+@pytest.mark.asyncio
+async def test_async_setup_and_unload_entry(
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     entry = config_entry_factory(data={CONF_TOKEN: "token", CONF_DB_PATH: ""})
 
-    asyncio.run(async_setup(hass, {}))
-    asyncio.run(async_setup_entry(hass, entry))
-    unload_ok = asyncio.run(async_unload_entry(hass, entry))
+    await async_setup(hass, {})
+    await async_setup_entry(hass, entry)
+    unload_ok = await async_unload_entry(hass, entry)
 
     assert unload_ok is True
     assert entry.runtime_data.token == "token"
     assert fake_hass.data[DOMAIN] == {}
 
 
-def test_async_unload_entry_false_does_not_remove_services(
+@pytest.mark.asyncio
+async def test_async_unload_entry_false_does_not_remove_services(
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
     fake_hass = FakeHass()
@@ -430,7 +431,7 @@ def test_async_unload_entry_false_does_not_remove_services(
     entry = config_entry_factory(runtime_data=RuntimeData(token="token", db_path=""))
     fake_hass.data[DOMAIN] = {"entry-1": entry.runtime_data}
 
-    unload_ok = asyncio.run(async_unload_entry(hass, entry))
+    unload_ok = await async_unload_entry(hass, entry)
 
     assert unload_ok is False
     assert fake_hass.data[DOMAIN] == {"entry-1": entry.runtime_data}
@@ -462,7 +463,8 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
     new_callable=AsyncMock,
     return_value=0,
 )
-def test_register_services_success_and_idempotence(
+@pytest.mark.asyncio
+async def test_register_services_success_and_idempotence(
     run_auto_approve: AsyncMock,
     run_pending_income: AsyncMock,
     run_sqlite_export: AsyncMock,
@@ -475,8 +477,8 @@ def test_register_services_success_and_idempotence(
     fake_hass.data[DOMAIN] = {"entry-1": runtime_data}
     entry = config_entry_factory(runtime_data=runtime_data)
 
-    asyncio.run(_async_register_services(hass))
-    asyncio.run(_async_register_services(hass))
+    await _async_register_services(hass)
+    await _async_register_services(hass)
 
     pending = cast(
         "ServiceHandler",
@@ -495,19 +497,15 @@ def test_register_services_success_and_idempotence(
         fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
     )
 
-    asyncio.run(auto_approve(FakeServiceCall(data={"for_real": True, "quiet": True})))
-    asyncio.run(pending(FakeServiceCall(data={"for_real": True, "quiet": True})))
-    asyncio.run(
-        sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
-    )
-    result = asyncio.run(
-        sqlite_query(
-            FakeServiceCall(
-                data={
-                    "sql": "select 1",
-                    "output_format": "csv",
-                }
-            )
+    await auto_approve(FakeServiceCall(data={"for_real": True, "quiet": True}))
+    await pending(FakeServiceCall(data={"for_real": True, "quiet": True}))
+    await sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
+    result = await sqlite_query(
+        FakeServiceCall(
+            data={
+                "sql": "select 1",
+                "output_format": "csv",
+            }
         )
     )
 
@@ -557,7 +555,8 @@ def test_register_services_success_and_idempotence(
     new_callable=AsyncMock,
     side_effect=RuntimeError("boom"),
 )
-def test_register_services_error_paths_raise_home_assistant_error(
+@pytest.mark.asyncio
+async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: AsyncMock,
     run_pending_income: AsyncMock,
     run_sqlite_export: Mock,
@@ -570,7 +569,7 @@ def test_register_services_error_paths_raise_home_assistant_error(
         "entry-1": RuntimeData(token="token", db_path="/tmp/db.sqlite3")
     }
 
-    asyncio.run(_async_register_services(hass))
+    await _async_register_services(hass)
     pending = cast(
         "ServiceHandler",
         fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
@@ -589,21 +588,17 @@ def test_register_services_error_paths_raise_home_assistant_error(
     )
 
     with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
-        asyncio.run(
-            auto_approve(FakeServiceCall(data={"for_real": False, "quiet": False}))
-        )
+        await auto_approve(FakeServiceCall(data={"for_real": False, "quiet": False}))
 
     with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
-        asyncio.run(pending(FakeServiceCall(data={"for_real": False, "quiet": False})))
+        await pending(FakeServiceCall(data={"for_real": False, "quiet": False}))
 
     with pytest.raises(HomeAssistantError, match="sqlite_export failed: boom"):
-        asyncio.run(
-            sqlite_export(FakeServiceCall(data={"full_refresh": False, "quiet": False}))
+        await sqlite_export(
+            FakeServiceCall(data={"full_refresh": False, "quiet": False})
         )
 
     with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
-        asyncio.run(
-            sqlite_query(
-                FakeServiceCall(data={"sql": "select 1", "output_format": "json"})
-            )
+        await sqlite_query(
+            FakeServiceCall(data={"sql": "select 1", "output_format": "json"})
         )

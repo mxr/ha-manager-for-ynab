@@ -2,3 +2,4 @@ covdefaults
 coverage
 homeassistant
 pytest
+pytest-asyncio
