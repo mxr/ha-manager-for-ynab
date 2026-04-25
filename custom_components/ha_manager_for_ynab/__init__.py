@@ -127,14 +127,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_pending_income(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
-            updated_count = await hass.async_add_executor_job(
-                partial(
-                    _api.run_pending_income,
-                    runtime_data.token,
-                    Path(runtime_data.db_path),
-                    for_real=call.data["for_real"],
-                    quiet=call.data["quiet"],
-                )
+            updated_count = await _api.run_pending_income(
+                runtime_data.token,
+                Path(runtime_data.db_path),
+                for_real=call.data["for_real"],
+                quiet=call.data["quiet"],
             )
         except Exception as err:
             LOGGER.exception("pending_income failed")
@@ -145,14 +142,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_auto_approve(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
-            await hass.async_add_executor_job(
-                partial(
-                    _api.run_auto_approve,
-                    runtime_data.token,
-                    Path(runtime_data.db_path),
-                    for_real=call.data["for_real"],
-                    quiet=call.data["quiet"],
-                )
+            await _api.run_auto_approve(
+                runtime_data.token,
+                Path(runtime_data.db_path),
+                for_real=call.data["for_real"],
+                quiet=call.data["quiet"],
             )
         except Exception as err:
             LOGGER.exception("auto_approve failed")
