@@ -229,16 +229,21 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
 
 @patch(
     "custom_components.ha_manager_for_ynab._api.pending_income",
+    new_callable=AsyncMock,
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
-def test_api_run_pending_income_returns_updated_count(pending_income: Mock) -> None:
+def test_api_run_pending_income_returns_updated_count(
+    pending_income: AsyncMock,
+) -> None:
     assert (
-        _api.run_pending_income(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        asyncio.run(
+            _api.run_pending_income(
+                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+            )
         )
         == 11
     )
-    pending_income.assert_called_once_with(
+    pending_income.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
         for_real=True,
@@ -250,16 +255,19 @@ def test_api_run_pending_income_returns_updated_count(pending_income: Mock) -> N
 
 @patch(
     "custom_components.ha_manager_for_ynab._api.auto_approve",
+    new_callable=AsyncMock,
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
-def test_api_run_auto_approve_returns_updated_count(auto_approve: Mock) -> None:
+def test_api_run_auto_approve_returns_updated_count(auto_approve: AsyncMock) -> None:
     assert (
-        _api.run_auto_approve(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        asyncio.run(
+            _api.run_auto_approve(
+                "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+            )
         )
         == 9
     )
-    auto_approve.assert_called_once_with(
+    auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
         for_real=True,
@@ -444,16 +452,23 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
     "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
     new_callable=AsyncMock,
 )
-@patch("custom_components.ha_manager_for_ynab._api.run_pending_income", return_value=4)
-@patch("custom_components.ha_manager_for_ynab._api.run_auto_approve", return_value=0)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_pending_income",
+    new_callable=AsyncMock,
+    return_value=4,
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+    new_callable=AsyncMock,
+    return_value=0,
+)
 def test_register_services_success_and_idempotence(
-    run_auto_approve: Mock,
-    run_pending_income: Mock,
+    run_auto_approve: AsyncMock,
+    run_pending_income: AsyncMock,
     run_sqlite_export: AsyncMock,
     run_sql_query: Mock,
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
-    del run_pending_income
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     runtime_data = RuntimeData(token="token", db_path="/tmp/db.sqlite3")
@@ -499,7 +514,13 @@ def test_register_services_success_and_idempotence(
     assert result == {"rows": [{"id": 1}]}
     assert len(fake_hass.services.registered) == 4
     assert entry.runtime_data.pending_income_updated_count == 4
-    run_auto_approve.assert_called_once_with(
+    run_auto_approve.assert_awaited_once_with(
+        "token",
+        Path("/tmp/db.sqlite3"),
+        for_real=True,
+        quiet=True,
+    )
+    run_pending_income.assert_awaited_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
@@ -528,15 +549,17 @@ def test_register_services_success_and_idempotence(
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_pending_income",
+    new_callable=AsyncMock,
     side_effect=RuntimeError("boom"),
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+    new_callable=AsyncMock,
     side_effect=RuntimeError("boom"),
 )
 def test_register_services_error_paths_raise_home_assistant_error(
-    run_auto_approve: Mock,
-    run_pending_income: Mock,
+    run_auto_approve: AsyncMock,
+    run_pending_income: AsyncMock,
     run_sqlite_export: Mock,
     run_sql_query: Mock,
 ) -> None:

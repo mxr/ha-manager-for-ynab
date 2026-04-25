@@ -26,12 +26,12 @@ def _rows_to_csv(columns: list[str], rows: list[dict[str, Any]]) -> str:
         return output.getvalue()
 
 
-def run_pending_income(
+async def run_pending_income(
     token: str, db_path: Path, *, for_real: bool, quiet: bool
 ) -> int:
     """Run pending income and return the updated transaction count."""
 
-    result = pending_income(
+    result = await pending_income(
         db=db_path,
         full_refresh=False,
         for_real=for_real,
@@ -42,10 +42,12 @@ def run_pending_income(
     return result.updated_count
 
 
-def run_auto_approve(token: str, db_path: Path, *, for_real: bool, quiet: bool) -> int:
+async def run_auto_approve(
+    token: str, db_path: Path, *, for_real: bool, quiet: bool
+) -> int:
     """Run auto approve and return the updated transaction count."""
 
-    result = auto_approve(
+    result = await auto_approve(
         db=db_path,
         full_refresh=False,
         for_real=for_real,
