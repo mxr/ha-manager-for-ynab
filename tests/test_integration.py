@@ -103,11 +103,6 @@ class FakeHass:
         self.data: dict[str, dict[str, RuntimeData]] = {}
         self.services = FakeServices()
         self.config_entries = FakeConfigEntries()
-        self.executor_jobs: list[Callable[[], object]] = []
-
-    async def async_add_executor_job(self, func: Callable[[], object]) -> object:
-        self.executor_jobs.append(func)
-        return func()
 
 
 @dataclass
@@ -273,12 +268,12 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
     new_callable=AsyncMock,
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
-def test_api_run_pending_income(pending_income: AsyncMock) -> None:
-    assert (
-        _api.run_pending_income(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-        )
-    ) == PendingIncomeResult(transactions=[], updated_count=11)
+@pytest.mark.asyncio
+async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
+    ret = await _api.run_pending_income(
+        "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+    )
+    assert ret == PendingIncomeResult(transactions=[], updated_count=11)
     pending_income.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -294,12 +289,12 @@ def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     new_callable=AsyncMock,
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
-def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
-    assert (
-        _api.run_auto_approve(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-        )
-    ) == AutoApproveResult(transactions=[], updated_count=9)
+@pytest.mark.asyncio
+async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
+    ret = await _api.run_auto_approve(
+        "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+    )
+    assert ret == AutoApproveResult(transactions=[], updated_count=9)
     auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
