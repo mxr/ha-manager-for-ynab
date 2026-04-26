@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from asyncio import run
 import aiosqlite
-from manager_for_ynab.auto_approve import auto_approve
-from manager_for_ynab.pending_income import pending_income
+from manager_for_ynab.auto_approve import AutoApproveResult, auto_approve
+from manager_for_ynab.pending_income import pending_income, PendingIncomeResult
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
 
 from typing import TYPE_CHECKING
@@ -15,12 +15,28 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+def run_auto_approve(
+    token: str, db_path: Path, *, for_real: bool, quiet: bool
+) -> AutoApproveResult:
+    """Run auto approve and return the transaction data + how many were updated."""
+
+    return run(
+        auto_approve(
+            db=db_path,
+            full_refresh=False,
+            for_real=for_real,
+            quiet=quiet,
+            token_override=token,
+        )
+    )
+
+
 def run_pending_income(
     token: str, db_path: Path, *, for_real: bool, quiet: bool
-) -> int:
-    """Run pending income and return the updated transaction count."""
+) -> PendingIncomeResult:
+    """Run pending income and return the transaction data + how many were updated."""
 
-    result = run(
+    return run(
         pending_income(
             db=db_path,
             full_refresh=False,
@@ -30,22 +46,6 @@ def run_pending_income(
             token_override=token,
         )
     )
-    return result.updated_count
-
-
-def run_auto_approve(token: str, db_path: Path, *, for_real: bool, quiet: bool) -> int:
-    """Run auto approve and return the updated transaction count."""
-
-    result = run(
-        auto_approve(
-            db=db_path,
-            full_refresh=False,
-            for_real=for_real,
-            quiet=quiet,
-            token_override=token,
-        )
-    )
-    return result.updated_count
 
 
 def run_sqlite_export(
