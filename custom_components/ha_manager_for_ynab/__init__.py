@@ -15,7 +15,6 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from . import _api
-from .const import ATTR_OUTPUT_FORMAT
 from .const import ATTR_SQL
 from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
@@ -55,7 +54,6 @@ SQLITE_EXPORT_SCHEMA = vol.Schema(
 SQLITE_QUERY_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_SQL): cv.string,
-        vol.Optional(ATTR_OUTPUT_FORMAT, default="json"): vol.In(("json", "csv")),
     }
 )
 
@@ -180,7 +178,6 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             result = await _api.run_sql_query(
                 Path(runtime_data.db_path),
                 call.data[ATTR_SQL],
-                output_format=call.data[ATTR_OUTPUT_FORMAT],
             )
         except Exception as err:
             LOGGER.exception("sqlite_query failed")

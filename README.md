@@ -9,7 +9,7 @@ Manager for YNAB is a Home Assistant custom integration for running `manager-for
 - `auto_approve` action with `for_real` and `quiet`
 - `pending_income` action with `for_real` and `quiet`
 - `sqlite_export` action with `full_refresh` and `quiet`
-- `sqlite_query` action with arbitrary SQL and `json` or `csv` output
+- `sqlite_query` action with arbitrary SQL
 - Sensor for the latest `pending_income` updated count
 
 If the configured DB path is empty, the integration uses `sqlite-export-for-ynab`'s default database path.
@@ -59,6 +59,5 @@ This runs `sqlite-export-for-ynab` against the configured token and DB path.
 ### `sqlite_query`
 
 - `sql`: required SQL statement
-- `output_format`: `json` or `csv`, default `json`
 
-This executes the SQL against the configured SQLite DB path and returns the result as service response data.
+This executes the SQL against the configured SQLite DB path and returns rows as service response data.
