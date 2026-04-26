@@ -48,12 +48,12 @@ def run_pending_income(
     )
 
 
-def run_sqlite_export(
+async def run_sqlite_export(
     token: str, db_path: Path, *, full_refresh: bool, quiet: bool
 ) -> None:
     """Run sqlite-export-for-ynab."""
 
-    run(sqlite_export_sync(token, db_path, full_refresh, quiet=quiet))
+    await sqlite_export_sync(token, db_path, full_refresh, quiet=quiet)
 
 
 async def run_sql_query(db_path: Path, sql: str) -> dict[str, Any]:
