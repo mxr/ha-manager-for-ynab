@@ -125,7 +125,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_pending_income(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
-            updated_count = await hass.async_add_executor_job(
+            result = await hass.async_add_executor_job(
                 partial(
                     _api.run_pending_income,
                     runtime_data.token,
@@ -138,7 +138,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("pending_income failed")
             raise HomeAssistantError(f"pending_income failed: {err}") from err
 
-        runtime_data.async_set_pending_income_updated_count(updated_count)
+        runtime_data.async_set_pending_income_updated_count(result.updated_count)
 
     async def async_handle_auto_approve(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)

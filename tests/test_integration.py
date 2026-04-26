@@ -153,8 +153,7 @@ def test_pending_income_sensor_reads_runtime_state() -> None:
 @patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
 @pytest.mark.asyncio
 async def test_sensor_async_added_to_hass_registers_listener(
-    async_on_remove: Mock,
-    async_write_ha_state: Mock,
+    async_on_remove: Mock, async_write_ha_state: Mock
 ) -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
@@ -179,8 +178,7 @@ async def test_sensor_async_added_to_hass_registers_listener(
 @patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
 @pytest.mark.asyncio
 async def test_sensor_async_added_to_hass_restores_last_state(
-    async_on_remove: Mock,
-    async_get_last_state: AsyncMock,
+    async_on_remove: Mock, async_get_last_state: AsyncMock
 ) -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
@@ -201,8 +199,7 @@ async def test_sensor_async_added_to_hass_restores_last_state(
 @patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
 @pytest.mark.asyncio
 async def test_sensor_async_added_to_hass_preserves_runtime_state(
-    async_on_remove: Mock,
-    async_get_last_state: AsyncMock,
+    async_on_remove: Mock, async_get_last_state: AsyncMock
 ) -> None:
     runtime_data = RuntimeData(
         token="token", db_path="/tmp/ynab.sqlite3", pending_income_updated_count=2
@@ -276,14 +273,12 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
     new_callable=AsyncMock,
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
-def test_api_run_pending_income_returns_updated_count(
-    pending_income: AsyncMock,
-) -> None:
+def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     assert (
         _api.run_pending_income(
             "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
-    ) == 11
+    ) == PendingIncomeResult(transactions=[], updated_count=11)
     pending_income.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -299,14 +294,12 @@ def test_api_run_pending_income_returns_updated_count(
     new_callable=AsyncMock,
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
-def test_api_run_auto_approve_returns_updated_count(
-    auto_approve: AsyncMock,
-) -> None:
+def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
     assert (
         _api.run_auto_approve(
             "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
-    ) == 9
+    ) == AutoApproveResult(transactions=[], updated_count=9)
     auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -347,6 +340,7 @@ async def test_api_run_sql_query(tmp_path: Path) -> None:
     ) == {
         "rows": [{"id": 1, "name": "Home"}, {"id": 2, "name": "Travel"}],
     }
+    assert await _api.run_sql_query(db_path, "PRAGMA query_only = ON;") == {}
 
 
 @pytest.mark.asyncio
@@ -473,16 +467,15 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
     return_value={"rows": [{"id": 1}]},
 )
 @patch(
-    "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
-    return_value=None,
+    "custom_components.ha_manager_for_ynab._api.run_sqlite_export", return_value=None
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_pending_income",
-    return_value=4,
+    return_value=PendingIncomeResult(transactions=[], updated_count=4),
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-    return_value=0,
+    return_value=AutoApproveResult(transactions=[], updated_count=0),
 )
 @pytest.mark.asyncio
 async def test_register_services_success_and_idempotence(
