@@ -270,11 +270,10 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
 )
 @pytest.mark.asyncio
 async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
-    assert (
-        await _api.run_pending_income(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-        )
-    ) == PendingIncomeResult(transactions=[], updated_count=11)
+    ret = await _api.run_pending_income(
+        "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+    )
+    assert ret == PendingIncomeResult(transactions=[], updated_count=11)
     pending_income.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -292,11 +291,10 @@ async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
 )
 @pytest.mark.asyncio
 async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
-    assert (
-        await _api.run_auto_approve(
-            "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
-        )
-    ) == AutoApproveResult(transactions=[], updated_count=9)
+    ret = await _api.run_auto_approve(
+        "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+    )
+    assert ret == AutoApproveResult(transactions=[], updated_count=9)
     auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
