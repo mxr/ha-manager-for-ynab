@@ -263,12 +263,12 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
         _user_schema()({"token": "token", "db_path": ""})
 
 
-@pytest.mark.asyncio
 @patch(
     "custom_components.ha_manager_for_ynab._api.pending_income",
     new_callable=AsyncMock,
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
+@pytest.mark.asyncio
 async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     assert (
         await _api.run_pending_income(
@@ -285,12 +285,12 @@ async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     )
 
 
-@pytest.mark.asyncio
 @patch(
     "custom_components.ha_manager_for_ynab._api.auto_approve",
     new_callable=AsyncMock,
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
+@pytest.mark.asyncio
 async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
     assert (
         await _api.run_auto_approve(
