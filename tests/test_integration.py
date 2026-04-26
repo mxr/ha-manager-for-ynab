@@ -340,6 +340,7 @@ async def test_api_run_sql_query(tmp_path: Path) -> None:
     ) == {
         "rows": [{"id": 1, "name": "Home"}, {"id": 2, "name": "Travel"}],
     }
+    assert await _api.run_sql_query(db_path, "PRAGMA query_only = ON;") == {}
 
 
 @pytest.mark.asyncio
@@ -468,8 +469,14 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_sqlite_export", return_value=None
 )
-@patch("custom_components.ha_manager_for_ynab._api.run_pending_income", return_value=4)
-@patch("custom_components.ha_manager_for_ynab._api.run_auto_approve", return_value=0)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_pending_income",
+    return_value=PendingIncomeResult(transactions=[], updated_count=4),
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+    return_value=AutoApproveResult(transactions=[], updated_count=0),
+)
 @pytest.mark.asyncio
 async def test_register_services_success_and_idempotence(
     run_auto_approve: Mock,
