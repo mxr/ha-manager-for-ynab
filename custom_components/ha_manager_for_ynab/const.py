@@ -13,7 +13,6 @@ CONF_TOKEN: Final = "token"
 
 ATTR_UPDATED_COUNT: Final = "updated_count"
 ATTR_DB_PATH: Final = "db_path"
-ATTR_OUTPUT_FORMAT: Final = "output_format"
 ATTR_SQL: Final = "sql"
 
 SERVICE_PENDING_INCOME: Final = "pending_income"

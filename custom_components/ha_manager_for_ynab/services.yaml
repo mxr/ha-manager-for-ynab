@@ -51,12 +51,3 @@ sqlite_query:
       selector:
         text:
           multiline: true
-    output_format:
-      required: false
-      example: json
-      default: json
-      selector:
-        select:
-          options:
-          - json
-          - csv

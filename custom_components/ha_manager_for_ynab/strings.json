@@ -67,10 +67,6 @@
     "sqlite_query": {
       "description": "Execute SQL against the configured SQLite database and return the results.",
       "fields": {
-        "output_format": {
-          "description": "Return rows as JSON objects or as a CSV string.",
-          "name": "Output format"
-        },
         "sql": {
           "description": "The SQL statement to execute against the configured SQLite database.",
           "name": "SQL"

@@ -246,10 +246,7 @@ def test_service_schemas_default_false_values() -> None:
     assert AUTO_APPROVE_SCHEMA({}) == {"for_real": False, "quiet": False}
     assert PENDING_INCOME_SCHEMA({}) == {"for_real": False, "quiet": False}
     assert SQLITE_EXPORT_SCHEMA({}) == {"full_refresh": False, "quiet": False}
-    assert SQLITE_QUERY_SCHEMA({"sql": "select 1"}) == {
-        "sql": "select 1",
-        "output_format": "json",
-    }
+    assert SQLITE_QUERY_SCHEMA({"sql": "select 1"}) == {"sql": "select 1"}
 
 
 @patch("custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path")
@@ -337,7 +334,7 @@ def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_api_run_sql_query_json(tmp_path: Path) -> None:
+async def test_api_run_sql_query(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
     with sqlite3.connect(db_path) as connection:
         connection.execute("create table budgets (id integer, name text)")
@@ -346,30 +343,9 @@ async def test_api_run_sql_query_json(tmp_path: Path) -> None:
         connection.commit()
 
     assert await _api.run_sql_query(
-        db_path, "select id, name from budgets order by id", output_format="json"
+        db_path, "select id, name from budgets order by id"
     ) == {
-        "output_format": "json",
-        "columns": ["id", "name"],
         "rows": [{"id": 1, "name": "Home"}, {"id": 2, "name": "Travel"}],
-        "rowcount": 2,
-    }
-
-
-@pytest.mark.asyncio
-async def test_api_run_sql_query_csv(tmp_path: Path) -> None:
-    db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.execute("create table budgets (id integer, name text)")
-        connection.execute("insert into budgets values (1, 'Home')")
-        connection.commit()
-
-    assert await _api.run_sql_query(
-        db_path, "select id, name from budgets", output_format="csv"
-    ) == {
-        "output_format": "csv",
-        "columns": ["id", "name"],
-        "csv": "id,name\r\n1,Home\r\n",
-        "rowcount": 1,
     }
 
 
@@ -381,9 +357,7 @@ async def test_api_run_sql_query_write(tmp_path: Path) -> None:
         connection.commit()
 
     with pytest.raises(aiosqlite.DatabaseError):
-        await _api.run_sql_query(
-            db_path, "insert into budgets values (1, 'Home')", output_format="json"
-        )
+        await _api.run_sql_query(db_path, "insert into budgets values (1, 'Home')")
 
     with sqlite3.connect(db_path) as connection:
         assert connection.execute("select count(*) from budgets").fetchone() == (0,)
@@ -551,7 +525,6 @@ async def test_register_services_success_and_idempotence(
         FakeServiceCall(
             data={
                 "sql": "select 1",
-                "output_format": "csv",
             }
         )
     )
@@ -580,7 +553,6 @@ async def test_register_services_success_and_idempotence(
     run_sql_query.assert_awaited_once_with(
         Path("/tmp/db.sqlite3"),
         "select 1",
-        output_format="csv",
     )
 
 
@@ -645,6 +617,4 @@ async def test_register_services_error_paths_raise_home_assistant_error(
         )
 
     with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
-        await sqlite_query(
-            FakeServiceCall(data={"sql": "select 1", "output_format": "json"})
-        )
+        await sqlite_query(FakeServiceCall(data={"sql": "select 1"}))
