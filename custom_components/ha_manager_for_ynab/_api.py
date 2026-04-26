@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import csv
 import io
-import sqlite3
 from asyncio import run
+import aiosqlite
 from manager_for_ynab.auto_approve import auto_approve
 from manager_for_ynab.pending_income import pending_income
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
@@ -68,25 +68,27 @@ def run_sqlite_export(
     run(sqlite_export_sync(token, db_path, full_refresh, quiet=quiet))
 
 
-def run_sql_query(db_path: Path, sql: str, *, output_format: str) -> dict[str, Any]:
+async def run_sql_query(
+    db_path: Path, sql: str, *, output_format: str
+) -> dict[str, Any]:
     """Execute a SQL statement against the configured SQLite database."""
 
-    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
-        connection.row_factory = sqlite3.Row
-        cursor = connection.execute(sql)
-        result: dict[str, Any] = {
-            "output_format": output_format,
-            "rowcount": cursor.rowcount,
-        }
+    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
+        connection.row_factory = aiosqlite.Row
+        async with connection.execute(sql) as cursor:
+            result: dict[str, Any] = {
+                "output_format": output_format,
+                "rowcount": cursor.rowcount,
+            }
 
-        if cursor.description is not None:
-            columns = [description[0] for description in cursor.description]
-            rows = [dict(row) for row in cursor.fetchall()]
-            result["columns"] = columns
-            result["rowcount"] = len(rows)
-            if output_format == "csv":
-                result["csv"] = _rows_to_csv(columns, rows)
-            else:
-                result["rows"] = rows
+            if cursor.description is not None:
+                columns = [description[0] for description in cursor.description]
+                rows = [dict(row) for row in await cursor.fetchall()]
+                result["columns"] = columns
+                result["rowcount"] = len(rows)
+                if output_format == "csv":
+                    result["csv"] = _rows_to_csv(columns, rows)
+                else:
+                    result["rows"] = rows
 
         return result

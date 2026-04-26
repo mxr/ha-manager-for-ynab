@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
+import aiosqlite
 from homeassistant.core import State
 from homeassistant.exceptions import HomeAssistantError
 from manager_for_ynab.auto_approve import AutoApproveResult
@@ -335,7 +336,8 @@ def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
     )
 
 
-def test_api_run_sql_query_json(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_api_run_sql_query_json(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
     with sqlite3.connect(db_path) as connection:
         connection.execute("create table budgets (id integer, name text)")
@@ -343,7 +345,7 @@ def test_api_run_sql_query_json(tmp_path: Path) -> None:
         connection.execute("insert into budgets values (2, 'Travel')")
         connection.commit()
 
-    assert _api.run_sql_query(
+    assert await _api.run_sql_query(
         db_path, "select id, name from budgets order by id", output_format="json"
     ) == {
         "output_format": "json",
@@ -353,14 +355,15 @@ def test_api_run_sql_query_json(tmp_path: Path) -> None:
     }
 
 
-def test_api_run_sql_query_csv(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_api_run_sql_query_csv(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
     with sqlite3.connect(db_path) as connection:
         connection.execute("create table budgets (id integer, name text)")
         connection.execute("insert into budgets values (1, 'Home')")
         connection.commit()
 
-    assert _api.run_sql_query(
+    assert await _api.run_sql_query(
         db_path, "select id, name from budgets", output_format="csv"
     ) == {
         "output_format": "csv",
@@ -370,14 +373,15 @@ def test_api_run_sql_query_csv(tmp_path: Path) -> None:
     }
 
 
-def test_api_run_sql_query_write(tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_api_run_sql_query_write(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
     with sqlite3.connect(db_path) as connection:
         connection.execute("create table budgets (id integer, name text)")
         connection.commit()
 
-    with pytest.raises(sqlite3.DatabaseError):
-        _api.run_sql_query(
+    with pytest.raises(aiosqlite.DatabaseError):
+        await _api.run_sql_query(
             db_path, "insert into budgets values (1, 'Home')", output_format="json"
         )
 
@@ -491,6 +495,7 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
 
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_sql_query",
+    new_callable=AsyncMock,
     return_value={"rows": [{"id": 1}]},
 )
 @patch(
@@ -510,7 +515,7 @@ async def test_register_services_success_and_idempotence(
     run_auto_approve: Mock,
     run_pending_income: Mock,
     run_sqlite_export: Mock,
-    run_sql_query: Mock,
+    run_sql_query: AsyncMock,
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
     fake_hass = FakeHass()
@@ -572,7 +577,7 @@ async def test_register_services_success_and_idempotence(
         full_refresh=True,
         quiet=False,
     )
-    run_sql_query.assert_called_once_with(
+    run_sql_query.assert_awaited_once_with(
         Path("/tmp/db.sqlite3"),
         "select 1",
         output_format="csv",
@@ -581,6 +586,7 @@ async def test_register_services_success_and_idempotence(
 
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_sql_query",
+    new_callable=AsyncMock,
     side_effect=RuntimeError("boom"),
 )
 @patch(
@@ -600,7 +606,7 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: Mock,
     run_pending_income: Mock,
     run_sqlite_export: Mock,
-    run_sql_query: Mock,
+    run_sql_query: AsyncMock,
 ) -> None:
     del run_auto_approve, run_pending_income, run_sqlite_export, run_sql_query
     fake_hass = FakeHass()
