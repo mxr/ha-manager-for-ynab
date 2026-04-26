@@ -177,13 +177,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_sqlite_query(call: ServiceCall) -> dict[str, object]:
         runtime_data = _get_runtime_data(hass)
         try:
-            result = await hass.async_add_executor_job(
-                partial(
-                    _api.run_sql_query,
-                    Path(runtime_data.db_path),
-                    call.data[ATTR_SQL],
-                    output_format=call.data[ATTR_OUTPUT_FORMAT],
-                )
+            result = await _api.run_sql_query(
+                Path(runtime_data.db_path),
+                call.data[ATTR_SQL],
+                output_format=call.data[ATTR_OUTPUT_FORMAT],
             )
         except Exception as err:
             LOGGER.exception("sqlite_query failed")
