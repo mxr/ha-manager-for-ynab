@@ -159,14 +159,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_sqlite_export(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
-            await hass.async_add_executor_job(
-                partial(
-                    _api.run_sqlite_export,
-                    runtime_data.token,
-                    Path(runtime_data.db_path),
-                    full_refresh=call.data["full_refresh"],
-                    quiet=call.data["quiet"],
-                )
+            await _api.run_sqlite_export(
+                runtime_data.token,
+                Path(runtime_data.db_path),
+                full_refresh=call.data["full_refresh"],
+                quiet=call.data["quiet"],
             )
         except Exception as err:
             LOGGER.exception("sqlite_export failed")

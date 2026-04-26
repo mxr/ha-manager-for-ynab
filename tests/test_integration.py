@@ -313,8 +313,9 @@ def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
     "custom_components.ha_manager_for_ynab._api.sqlite_export_sync",
     new_callable=AsyncMock,
 )
-def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
-    _api.run_sqlite_export(
+@pytest.mark.asyncio
+async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
+    await _api.run_sqlite_export(
         "token",
         Path("/tmp/db.sqlite3"),
         full_refresh=True,
