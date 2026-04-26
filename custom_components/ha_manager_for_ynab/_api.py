@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from asyncio import run
 import aiosqlite
 from manager_for_ynab.auto_approve import AutoApproveResult, auto_approve
 from manager_for_ynab.pending_income import pending_income, PendingIncomeResult
@@ -15,36 +14,32 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def run_auto_approve(
+async def run_auto_approve(
     token: str, db_path: Path, *, for_real: bool, quiet: bool
 ) -> AutoApproveResult:
     """Run auto approve and return the transaction data + how many were updated."""
 
-    return run(
-        auto_approve(
-            db=db_path,
-            full_refresh=False,
-            for_real=for_real,
-            quiet=quiet,
-            token_override=token,
-        )
+    return await auto_approve(
+        db=db_path,
+        full_refresh=False,
+        for_real=for_real,
+        quiet=quiet,
+        token_override=token,
     )
 
 
-def run_pending_income(
+async def run_pending_income(
     token: str, db_path: Path, *, for_real: bool, quiet: bool
 ) -> PendingIncomeResult:
     """Run pending income and return the transaction data + how many were updated."""
 
-    return run(
-        pending_income(
-            db=db_path,
-            full_refresh=False,
-            for_real=for_real,
-            skip_matched=False,
-            quiet=quiet,
-            token_override=token,
-        )
+    return await pending_income(
+        db=db_path,
+        full_refresh=False,
+        for_real=for_real,
+        skip_matched=False,
+        quiet=quiet,
+        token_override=token,
     )
 
 

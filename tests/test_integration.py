@@ -103,11 +103,6 @@ class FakeHass:
         self.data: dict[str, dict[str, RuntimeData]] = {}
         self.services = FakeServices()
         self.config_entries = FakeConfigEntries()
-        self.executor_jobs: list[Callable[[], object]] = []
-
-    async def async_add_executor_job(self, func: Callable[[], object]) -> object:
-        self.executor_jobs.append(func)
-        return func()
 
 
 @dataclass
@@ -268,14 +263,15 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
         _user_schema()({"token": "token", "db_path": ""})
 
 
+@pytest.mark.asyncio
 @patch(
     "custom_components.ha_manager_for_ynab._api.pending_income",
     new_callable=AsyncMock,
     return_value=PendingIncomeResult(transactions=[], updated_count=11),
 )
-def test_api_run_pending_income(pending_income: AsyncMock) -> None:
+async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     assert (
-        _api.run_pending_income(
+        await _api.run_pending_income(
             "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
     ) == PendingIncomeResult(transactions=[], updated_count=11)
@@ -289,14 +285,15 @@ def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     )
 
 
+@pytest.mark.asyncio
 @patch(
     "custom_components.ha_manager_for_ynab._api.auto_approve",
     new_callable=AsyncMock,
     return_value=AutoApproveResult(transactions=[], updated_count=9),
 )
-def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
+async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
     assert (
-        _api.run_auto_approve(
+        await _api.run_auto_approve(
             "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
         )
     ) == AutoApproveResult(transactions=[], updated_count=9)
