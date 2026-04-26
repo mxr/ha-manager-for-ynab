@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import sqlite3
+from asyncio import run
 from manager_for_ynab.auto_approve import auto_approve
 from manager_for_ynab.pending_income import pending_income
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
@@ -26,43 +27,45 @@ def _rows_to_csv(columns: list[str], rows: list[dict[str, Any]]) -> str:
         return output.getvalue()
 
 
-async def run_pending_income(
+def run_pending_income(
     token: str, db_path: Path, *, for_real: bool, quiet: bool
 ) -> int:
     """Run pending income and return the updated transaction count."""
 
-    result = await pending_income(
-        db=db_path,
-        full_refresh=False,
-        for_real=for_real,
-        skip_matched=False,
-        quiet=quiet,
-        token_override=token,
+    result = run(
+        pending_income(
+            db=db_path,
+            full_refresh=False,
+            for_real=for_real,
+            skip_matched=False,
+            quiet=quiet,
+            token_override=token,
+        )
     )
     return result.updated_count
 
 
-async def run_auto_approve(
-    token: str, db_path: Path, *, for_real: bool, quiet: bool
-) -> int:
+def run_auto_approve(token: str, db_path: Path, *, for_real: bool, quiet: bool) -> int:
     """Run auto approve and return the updated transaction count."""
 
-    result = await auto_approve(
-        db=db_path,
-        full_refresh=False,
-        for_real=for_real,
-        quiet=quiet,
-        token_override=token,
+    result = run(
+        auto_approve(
+            db=db_path,
+            full_refresh=False,
+            for_real=for_real,
+            quiet=quiet,
+            token_override=token,
+        )
     )
     return result.updated_count
 
 
-async def run_sqlite_export(
+def run_sqlite_export(
     token: str, db_path: Path, *, full_refresh: bool, quiet: bool
 ) -> None:
     """Run sqlite-export-for-ynab."""
 
-    await sqlite_export_sync(token, db_path, full_refresh, quiet=quiet)
+    run(sqlite_export_sync(token, db_path, full_refresh, quiet=quiet))
 
 
 def run_sql_query(db_path: Path, sql: str, *, output_format: str) -> dict[str, Any]:
