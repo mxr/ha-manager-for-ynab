@@ -52,7 +52,7 @@ async def run_sqlite_export(
 
 
 async def run_sql_query(db_path: Path, sql: str) -> dict[str, Any]:
-    """Execute a SQL script against the configured SQLite database."""
+    """Execute a SQL query (multiple statements) against the configured SQLite database."""
 
     async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
         connection.row_factory = aiosqlite.Row
