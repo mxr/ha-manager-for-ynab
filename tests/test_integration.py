@@ -337,6 +337,16 @@ async def test_api_run_sql_query(tmp_path: Path) -> None:
         "rows": [{"id": 1, "name": "Home"}, {"id": 2, "name": "Travel"}],
     }
     assert await _api.run_sql_query(db_path, "PRAGMA query_only = ON;") == {}
+    assert await _api.run_sql_query(
+        db_path,
+        "SELECT id, name FROM budgets ORDER BY id; SELECT id, name FROM budgets WHERE id = 2;",
+    ) == {
+        "rows": [
+            {"id": 1, "name": "Home"},
+            {"id": 2, "name": "Travel"},
+            {"id": 2, "name": "Travel"},
+        ],
+    }
 
 
 @pytest.mark.asyncio

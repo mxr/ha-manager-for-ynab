@@ -52,13 +52,16 @@ async def run_sqlite_export(
 
 
 async def run_sql_query(db_path: Path, sql: str) -> dict[str, Any]:
-    """Execute a SQL statement against the configured SQLite database."""
+    """Execute a SQL script against the configured SQLite database."""
 
     async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
         connection.row_factory = aiosqlite.Row
-        async with connection.execute(sql) as cursor:
-            if cursor.description is not None:
-                rows = [dict(row) for row in await cursor.fetchall()]
-                return {"rows": rows}
 
-        return {}
+        rows: list[dict[str, Any]] = []
+        for raw_statement in sql.split(";"):
+            if statement := raw_statement.strip():
+                async with connection.execute(statement) as cursor:
+                    if cursor.description is not None:
+                        rows.extend(dict(row) for row in await cursor.fetchall())
+
+        return {"rows": rows} if rows else {}
