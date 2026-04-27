@@ -68,7 +68,7 @@
       "description": "Execute SQL against the configured SQLite database and return the results.",
       "fields": {
         "sql": {
-          "description": "The SQL statement to execute against the configured SQLite database.",
+          "description": "The SQL statement(s) to execute against the configured SQLite database.",
           "name": "SQL"
         }
       },
