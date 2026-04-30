@@ -6,10 +6,10 @@ Manager for YNAB is a Home Assistant custom integration for running `manager-for
 
 - Config flow for a YNAB personal access token
 - Optional SQLite DB path configuration
-- `auto_approve` action with `for_real` and `quiet`
-- `pending_income` action with `for_real` and `quiet`
+- `auto_approve` action with `for_real`, `sync`, and `quiet`
+- `pending_income` action with `for_real`, `sync`, and `quiet`
 - `sqlite_export` action with `full_refresh` and `quiet`
-- `sqlite_query` action with arbitrary SQL
+- `sqlite_query` action with arbitrary SQL and optional sync
 - Sensor for the latest `pending_income` updated count
 
 If the configured DB path is empty, the integration uses `sqlite-export-for-ynab`'s default database path.
@@ -38,6 +38,7 @@ Leave the DB path empty to use the default path from `sqlite-export-for-ynab`.
 ### `auto_approve`
 
 - `for_real`: default `false`
+- `sync`: default `true`
 - `quiet`: default `false`
 
 This runs `manager-for-ynab.auto_approve.auto_approve(...)`.
@@ -45,6 +46,7 @@ This runs `manager-for-ynab.auto_approve.auto_approve(...)`.
 ### `pending_income`
 
 - `for_real`: default `false`
+- `sync`: default `true`
 - `quiet`: default `false`
 
 This runs `manager-for-ynab.pending_income.pending_income(...)` and updates the sensor to the returned `updated_count`.
@@ -59,5 +61,6 @@ This runs `sqlite-export-for-ynab` against the configured token and DB path.
 ### `sqlite_query`
 
 - `sql`: required SQL statement
+- `sync`: default `true`
 
 This executes the SQL against the configured SQLite DB path and returns rows as service response data.

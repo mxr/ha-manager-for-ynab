@@ -15,13 +15,14 @@ if TYPE_CHECKING:
 
 
 async def run_auto_approve(
-    token: str, db_path: Path, *, for_real: bool, quiet: bool
+    token: str, db_path: Path, *, for_real: bool, sync: bool, quiet: bool
 ) -> AutoApproveResult:
     """Run auto approve and return the transaction data + how many were updated."""
 
     return await auto_approve(
         db=db_path,
         full_refresh=False,
+        should_sync=sync,
         for_real=for_real,
         quiet=quiet,
         token_override=token,
@@ -29,13 +30,14 @@ async def run_auto_approve(
 
 
 async def run_pending_income(
-    token: str, db_path: Path, *, for_real: bool, quiet: bool
+    token: str, db_path: Path, *, for_real: bool, sync: bool, quiet: bool
 ) -> PendingIncomeResult:
     """Run pending income and return the transaction data + how many were updated."""
 
     return await pending_income(
         db=db_path,
         full_refresh=False,
+        should_sync=sync,
         for_real=for_real,
         skip_matched=False,
         quiet=quiet,

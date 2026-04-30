@@ -32,6 +32,10 @@
         "quiet": {
           "description": "Suppress output from the underlying library.",
           "name": "Quiet"
+        },
+        "sync": {
+          "description": "Sync the SQLite export before processing transactions.",
+          "name": "Sync"
         }
       },
       "name": "Auto approve"
@@ -46,6 +50,10 @@
         "quiet": {
           "description": "Suppress output from the underlying library.",
           "name": "Quiet"
+        },
+        "sync": {
+          "description": "Sync the SQLite export before processing transactions.",
+          "name": "Sync"
         }
       },
       "name": "Pending income"
@@ -70,6 +78,10 @@
         "sql": {
           "description": "The SQL statement(s) to execute against the configured SQLite database.",
           "name": "SQL"
+        },
+        "sync": {
+          "description": "Sync the SQLite export before executing the query.",
+          "name": "Sync"
         }
       },
       "name": "SQLite query"

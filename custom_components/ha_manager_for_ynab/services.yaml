@@ -6,6 +6,12 @@ pending_income:
       default: false
       selector:
         boolean:
+    sync:
+      required: true
+      example: true
+      default: true
+      selector:
+        boolean:
     quiet:
       required: true
       example: false
@@ -19,6 +25,12 @@ auto_approve:
       required: true
       example: false
       default: false
+      selector:
+        boolean:
+    sync:
+      required: true
+      example: true
+      default: true
       selector:
         boolean:
     quiet:
@@ -45,6 +57,12 @@ sqlite_export:
 
 sqlite_query:
   fields:
+    sync:
+      required: true
+      example: true
+      default: true
+      selector:
+        boolean:
     sql:
       required: true
       example: SELECT * FROM budgets LIMIT 10
