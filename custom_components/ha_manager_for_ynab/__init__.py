@@ -35,12 +35,14 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 PENDING_INCOME_SCHEMA = vol.Schema(
     {
         vol.Required("for_real", default=False): cv.boolean,
+        vol.Required("sync", default=True): cv.boolean,
         vol.Required("quiet", default=False): cv.boolean,
     }
 )
 AUTO_APPROVE_SCHEMA = vol.Schema(
     {
         vol.Required("for_real", default=False): cv.boolean,
+        vol.Required("sync", default=True): cv.boolean,
         vol.Required("quiet", default=False): cv.boolean,
     }
 )
@@ -52,6 +54,7 @@ SQLITE_EXPORT_SCHEMA = vol.Schema(
 )
 SQLITE_QUERY_SCHEMA = vol.Schema(
     {
+        vol.Required("sync", default=True): cv.boolean,
         vol.Required(ATTR_SQL): cv.string,
     }
 )
@@ -128,6 +131,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 runtime_data.token,
                 Path(runtime_data.db_path),
                 for_real=call.data["for_real"],
+                sync=call.data["sync"],
                 quiet=call.data["quiet"],
             )
         except Exception as err:
@@ -143,6 +147,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 runtime_data.token,
                 Path(runtime_data.db_path),
                 for_real=call.data["for_real"],
+                sync=call.data["sync"],
                 quiet=call.data["quiet"],
             )
         except Exception as err:
@@ -165,6 +170,13 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_sqlite_query(call: ServiceCall) -> dict[str, object]:
         runtime_data = _get_runtime_data(hass)
         try:
+            if call.data["sync"]:
+                await _api.run_sqlite_export(
+                    runtime_data.token,
+                    Path(runtime_data.db_path),
+                    full_refresh=False,
+                    quiet=True,
+                )
             result = await _api.run_sql_query(
                 Path(runtime_data.db_path),
                 call.data[ATTR_SQL],

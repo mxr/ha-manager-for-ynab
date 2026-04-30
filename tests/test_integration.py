@@ -9,6 +9,7 @@ from typing import cast
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
+from unittest.mock import call
 from unittest.mock import patch
 
 import pytest
@@ -234,11 +235,15 @@ async def test_sensor_async_setup_entry_adds_entity(
     assert isinstance(added[0], PendingIncomeUpdatedCountSensor)
 
 
-def test_service_schemas_default_false_values() -> None:
-    assert AUTO_APPROVE_SCHEMA({}) == {"for_real": False, "quiet": False}
-    assert PENDING_INCOME_SCHEMA({}) == {"for_real": False, "quiet": False}
+def test_service_schemas_default_values() -> None:
+    assert AUTO_APPROVE_SCHEMA({}) == {"for_real": False, "sync": True, "quiet": False}
+    assert PENDING_INCOME_SCHEMA({}) == {
+        "for_real": False,
+        "sync": True,
+        "quiet": False,
+    }
     assert SQLITE_EXPORT_SCHEMA({}) == {"full_refresh": False, "quiet": False}
-    assert SQLITE_QUERY_SCHEMA({"sql": "select 1"}) == {"sql": "select 1"}
+    assert SQLITE_QUERY_SCHEMA({"sql": "select 1"}) == {"sync": True, "sql": "select 1"}
 
 
 @patch("custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path")
@@ -271,12 +276,13 @@ def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None
 @pytest.mark.asyncio
 async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
     ret = await _api.run_pending_income(
-        "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        "token", Path("/tmp/db.sqlite3"), for_real=True, sync=False, quiet=False
     )
     assert ret == PendingIncomeResult(transactions=[], updated_count=11)
     pending_income.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
+        should_sync=False,
         for_real=True,
         skip_matched=False,
         quiet=False,
@@ -292,12 +298,13 @@ async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
     ret = await _api.run_auto_approve(
-        "token", Path("/tmp/db.sqlite3"), for_real=True, quiet=False
+        "token", Path("/tmp/db.sqlite3"), for_real=True, sync=False, quiet=False
     )
     assert ret == AutoApproveResult(transactions=[], updated_count=9)
     auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
+        should_sync=False,
         for_real=True,
         quiet=False,
         token_override="token",
@@ -517,12 +524,17 @@ async def test_register_services_success_and_idempotence(
         fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
     )
 
-    await auto_approve(FakeServiceCall(data={"for_real": True, "quiet": True}))
-    await pending(FakeServiceCall(data={"for_real": True, "quiet": True}))
+    await auto_approve(
+        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
+    )
+    await pending(
+        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
+    )
     await sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
     result = await sqlite_query(
         FakeServiceCall(
             data={
+                "sync": True,
                 "sql": "select 1",
             }
         )
@@ -535,19 +547,21 @@ async def test_register_services_success_and_idempotence(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
+        sync=False,
         quiet=True,
     )
     run_pending_income.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
+        sync=False,
         quiet=True,
     )
-    run_sqlite_export.assert_called_once_with(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        full_refresh=True,
-        quiet=False,
+    run_sqlite_export.assert_has_calls(
+        [
+            call("token", Path("/tmp/db.sqlite3"), full_refresh=True, quiet=False),
+            call("token", Path("/tmp/db.sqlite3"), full_refresh=False, quiet=True),
+        ]
     )
     run_sql_query.assert_awaited_once_with(
         Path("/tmp/db.sqlite3"),
@@ -605,10 +619,14 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     )
 
     with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
-        await auto_approve(FakeServiceCall(data={"for_real": False, "quiet": False}))
+        await auto_approve(
+            FakeServiceCall(data={"for_real": False, "sync": True, "quiet": False})
+        )
 
     with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
-        await pending(FakeServiceCall(data={"for_real": False, "quiet": False}))
+        await pending(
+            FakeServiceCall(data={"for_real": False, "sync": True, "quiet": False})
+        )
 
     with pytest.raises(HomeAssistantError, match="sqlite_export failed: boom"):
         await sqlite_export(
@@ -616,4 +634,4 @@ async def test_register_services_error_paths_raise_home_assistant_error(
         )
 
     with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
-        await sqlite_query(FakeServiceCall(data={"sql": "select 1"}))
+        await sqlite_query(FakeServiceCall(data={"sync": False, "sql": "select 1"}))
