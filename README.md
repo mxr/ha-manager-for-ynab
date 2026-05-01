@@ -82,4 +82,4 @@ This returns current plans, accounts, payees, categories, and cleared statuses f
 - `sync`: default `true`
 - `quiet`: default `false`
 
-This creates a transaction through the YNAB API directly. It does not call `manager-for-ynab add_transaction`.
+This creates a transaction with `manager-for-ynab`'s add-transaction fund-moving helper. Dropdown values still come from the configured SQLite export.

@@ -443,8 +443,11 @@ async def test_api_get_add_transaction_options(tmp_path: Path) -> None:
     }
 
 
-@patch("custom_components.ha_manager_for_ynab._api.ynab.TransactionsApi", autospec=True)
-@patch("custom_components.ha_manager_for_ynab._api.ynab.ApiClient", autospec=True)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    new_callable=AsyncMock,
+    return_value=0,
+)
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
     new_callable=AsyncMock,
@@ -452,8 +455,7 @@ async def test_api_get_add_transaction_options(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_api_run_add_transaction(
     run_sqlite_export: AsyncMock,
-    api_client: MagicMock,
-    transactions_api: MagicMock,
+    add_transaction_and_move_funds: AsyncMock,
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
@@ -465,14 +467,14 @@ async def test_api_run_add_transaction(
         connection.executescript(
             """
             CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, deleted BOOLEAN, closed BOOLEAN);
+            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
             CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, deleted BOOLEAN);
+            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
             """
         )
         connection.execute("INSERT INTO plans VALUES (?, 'Budget')", (plan_id,))
         connection.execute(
-            "INSERT INTO accounts VALUES (?, ?, 'Checking', 0, 0)",
+            "INSERT INTO accounts VALUES (?, ?, 'Checking', 'checking', 0, 0)",
             (account_id, plan_id),
         )
         connection.execute(
@@ -480,14 +482,10 @@ async def test_api_run_add_transaction(
             (category_id, plan_id),
         )
         connection.execute(
-            "INSERT INTO payees VALUES (?, ?, 'Power Co', 0)", (payee_id, plan_id)
+            "INSERT INTO payees VALUES (?, ?, 'Power Co', NULL, 0)",
+            (payee_id, plan_id),
         )
         connection.commit()
-
-    api_context = MagicMock()
-    api_client.return_value.__enter__.return_value = api_context
-    transactions = MagicMock()
-    transactions_api.return_value = transactions
 
     await _api.run_add_transaction(
         "token",
@@ -506,15 +504,23 @@ async def test_api_run_add_transaction(
     run_sqlite_export.assert_awaited_once_with(
         "token", db_path, full_refresh=False, quiet=True
     )
-    transactions_api.assert_called_once_with(api_context)
-    create_args = transactions.create_transaction.call_args.args
-    assert create_args[0] == plan_id
-    transaction = create_args[1].transaction
-    assert str(transaction.account_id) == account_id
-    assert str(transaction.payee_id) == payee_id
-    assert str(transaction.category_id) == category_id
-    assert transaction.amount == -12340
-    assert transaction.var_date == datetime.date(2026, 5, 1)
+    add_transaction_and_move_funds.assert_awaited_once()
+    assert add_transaction_and_move_funds.call_args.kwargs["token"] == "token"
+    assert add_transaction_and_move_funds.call_args.kwargs["db"] == db_path
+    assert add_transaction_and_move_funds.call_args.kwargs["for_real"] is True
+    assert add_transaction_and_move_funds.call_args.kwargs["quiet"] is True
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert resolved.plan.id == plan_id
+    assert resolved.plan.name == "Budget"
+    assert resolved.account.id == account_id
+    assert resolved.account.name == "Checking"
+    assert resolved.account.type == "checking"
+    assert resolved.payee.id == payee_id
+    assert resolved.payee.name == "Power Co"
+    assert resolved.category.id == category_id
+    assert resolved.category.name == "Electric"
+    assert resolved.date == datetime.date(2026, 5, 1)
+    assert resolved.amount == Decimal("12.34")
 
 
 @patch.object(

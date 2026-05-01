@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass
-import uuid
-
 import aiosqlite
+from manager_for_ynab.add_transaction import add_transaction_and_move_funds
+from manager_for_ynab.add_transaction import ResolvedAccount
+from manager_for_ynab.add_transaction import ResolvedCategory
+from manager_for_ynab.add_transaction import ResolvedPayee
+from manager_for_ynab.add_transaction import ResolvedPlan
+from manager_for_ynab.add_transaction import ResolvedTransaction
 from manager_for_ynab.auto_approve import AutoApproveResult, auto_approve
 from manager_for_ynab.pending_income import pending_income, PendingIncomeResult
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
-import ynab
 from ynab.models.transaction_cleared_status import TransactionClearedStatus
 
 from typing import TYPE_CHECKING
@@ -20,16 +21,6 @@ if TYPE_CHECKING:
     import datetime
     from decimal import Decimal
     from pathlib import Path
-
-
-@dataclass(frozen=True)
-class AddTransactionSelection:
-    """Resolved transaction fields loaded from the SQLite export."""
-
-    plan_id: str
-    account_id: str
-    payee_id: str | None
-    category_id: str | None
 
 
 async def run_auto_approve(
@@ -90,35 +81,25 @@ async def run_add_transaction(
     if sync:
         await run_sqlite_export(token, db_path, full_refresh=False, quiet=quiet)
 
-    selection = await _resolve_add_transaction_selection(
+    resolved = await _resolve_add_transaction(
         db_path,
         plan_name=plan_name,
         account_name=account_name,
         payee_name=payee_name,
         category_name=category_name,
-    )
-    transaction = ynab.NewTransaction(
-        account_id=uuid.UUID(selection.account_id),
         date=date,
-        payee_id=uuid.UUID(selection.payee_id)
-        if selection.payee_id is not None
-        else None,
-        payee_name=payee_name,
-        amount=int(-1 * 1000 * amount),
-        category_id=uuid.UUID(selection.category_id)
-        if selection.category_id is not None
-        else None,
-        cleared=TransactionClearedStatus[cleared.upper()],
-        approved=True,
+        cleared=cleared,
+        amount=amount,
     )
-
-    with ynab.ApiClient(ynab.Configuration(access_token=token)) as api_client:
-        transactions_api = ynab.TransactionsApi(api_client)
-        await asyncio.to_thread(
-            transactions_api.create_transaction,
-            selection.plan_id,
-            ynab.PostTransactionsWrapper(transaction=transaction),
-        )
+    result = await add_transaction_and_move_funds(
+        resolved=resolved,
+        token=token,
+        db=db_path,
+        for_real=True,
+        quiet=quiet,
+    )
+    if result != 0:
+        raise RuntimeError("manager-for-ynab add_transaction_and_move_funds failed")
 
 
 async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
@@ -188,77 +169,92 @@ async def run_sql_query(db_path: Path, sql: str) -> dict[str, Any]:
         return {"rows": rows} if rows else {}
 
 
-async def _resolve_add_transaction_selection(
+async def _resolve_add_transaction(
     db_path: Path,
     *,
     plan_name: str | None,
     account_name: str,
     payee_name: str,
     category_name: str | None,
-) -> AddTransactionSelection:
+    date: datetime.date,
+    cleared: str,
+    amount: Decimal,
+) -> ResolvedTransaction:
     async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
         connection.row_factory = aiosqlite.Row
-        plan_id = await _resolve_plan_id(connection, plan_name)
-        account_id = await _fetch_one_value(
+        plan = await _resolve_plan(connection, plan_name)
+        account = await _fetch_one_row(
             connection,
             """
-            SELECT id
+            SELECT id, name, type
             FROM accounts
             WHERE plan_id = ? AND name = ? AND NOT deleted AND NOT closed
             """,
-            (plan_id, account_name),
+            (plan.id, account_name),
             f"No open account named {account_name!r} found in selected plan.",
         )
-        payee_id = await _fetch_optional_value(
+        payee = await _fetch_one_row(
             connection,
             """
-            SELECT id
+            SELECT id, name, transfer_account_id
             FROM payees
             WHERE plan_id = ? AND name = ? AND NOT deleted
             """,
-            (plan_id, payee_name),
+            (plan.id, payee_name),
+            f"No payee named {payee_name!r} found in selected plan.",
         )
-        category_id = None
+        category = None
         if category_name:
-            category_id = await _fetch_one_value(
+            if payee["transfer_account_id"] is not None:
+                raise ValueError("Category not allowed for transfer transactions")
+            category_row = await _fetch_one_row(
                 connection,
                 """
-                SELECT id
+                SELECT id, name
                 FROM categories
                 WHERE plan_id = ?
                   AND category_group_name || ' - ' || name = ?
                   AND NOT deleted
                   AND NOT hidden
                 """,
-                (plan_id, category_name),
+                (plan.id, category_name),
                 f"No category named {category_name!r} found in selected plan.",
             )
+            category = ResolvedCategory(
+                id=str(category_row["id"]), name=str(category_row["name"])
+            )
 
-    return AddTransactionSelection(
-        plan_id=plan_id,
-        account_id=account_id,
-        payee_id=payee_id,
-        category_id=category_id,
+    return ResolvedTransaction(
+        plan=plan,
+        account=ResolvedAccount(
+            id=str(account["id"]), name=str(account["name"]), type=str(account["type"])
+        ),
+        payee=ResolvedPayee(id=str(payee["id"]), name=str(payee["name"])),
+        category=category,
+        date=date,
+        cleared=TransactionClearedStatus[cleared.upper()],
+        amount=amount,
     )
 
 
-async def _resolve_plan_id(
+async def _resolve_plan(
     connection: aiosqlite.Connection, plan_name: str | None
-) -> str:
+) -> ResolvedPlan:
     if plan_name:
-        return await _fetch_one_value(
+        row = await _fetch_one_row(
             connection,
-            "SELECT id FROM plans WHERE name = ?",
+            "SELECT id, name FROM plans WHERE name = ?",
             (plan_name,),
             f"No plan named {plan_name!r} found.",
         )
+        return ResolvedPlan(id=str(row["id"]), name=str(row["name"]))
 
     async with connection.execute(
-        "SELECT id FROM plans ORDER BY LOWER(name)"
+        "SELECT id, name FROM plans ORDER BY LOWER(name)"
     ) as cursor:
         rows = list(await cursor.fetchall())
     if len(rows) == 1:
-        return str(rows[0]["id"])
+        return ResolvedPlan(id=str(rows[0]["id"]), name=str(rows[0]["name"]))
     if not rows:
         raise RuntimeError("No plans found in SQLite export.")
     raise RuntimeError("Plan name is required when SQLite export has multiple plans.")
@@ -281,23 +277,14 @@ async def _fetch_grouped_column(
     return grouped
 
 
-async def _fetch_one_value(
+async def _fetch_one_row(
     connection: aiosqlite.Connection,
     sql: str,
     params: tuple[str, ...],
     error_message: str,
-) -> str:
-    value = await _fetch_optional_value(connection, sql, params)
-    if value is None:
-        raise RuntimeError(error_message)
-    return value
-
-
-async def _fetch_optional_value(
-    connection: aiosqlite.Connection,
-    sql: str,
-    params: tuple[str, ...],
-) -> str | None:
+) -> Any:
     async with connection.execute(sql, params) as cursor:
         row = await cursor.fetchone()
-    return str(row[0]) if row is not None else None
+    if row is None:
+        raise RuntimeError(error_message)
+    return row
