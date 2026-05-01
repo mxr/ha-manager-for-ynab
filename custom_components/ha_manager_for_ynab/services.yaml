@@ -126,6 +126,3 @@ add_transaction:
       default: false
       selector:
         boolean:
-
-add_transaction_options:
-  fields: {}

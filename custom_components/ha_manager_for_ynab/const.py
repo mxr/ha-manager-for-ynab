@@ -27,6 +27,5 @@ SERVICE_AUTO_APPROVE: Final = "auto_approve"
 SERVICE_SQLITE_EXPORT: Final = "sqlite_export"
 SERVICE_SQLITE_QUERY: Final = "sqlite_query"
 SERVICE_ADD_TRANSACTION: Final = "add_transaction"
-SERVICE_ADD_TRANSACTION_OPTIONS: Final = "add_transaction_options"
 
 LOGGER = logging.getLogger(__name__)

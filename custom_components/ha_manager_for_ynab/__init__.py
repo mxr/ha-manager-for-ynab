@@ -29,7 +29,6 @@ from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
 from .const import DOMAIN
 from .const import SERVICE_ADD_TRANSACTION
-from .const import SERVICE_ADD_TRANSACTION_OPTIONS
 from .const import LOGGER
 from .const import SERVICE_AUTO_APPROVE
 from .const import SERVICE_PENDING_INCOME
@@ -87,7 +86,6 @@ ADD_TRANSACTION_SCHEMA = vol.Schema(
         vol.Required("quiet", default=False): cv.boolean,
     }
 )
-ADD_TRANSACTION_OPTIONS_SCHEMA = vol.Schema({})
 
 
 @dataclass
@@ -170,6 +168,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(f"pending_income failed: {err}") from err
 
         runtime_data.async_set_pending_income_updated_count(result.updated_count)
+        if call.data["sync"]:
+            await _async_update_add_transaction_service_schema(hass, runtime_data)
 
     async def async_handle_auto_approve(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
@@ -185,6 +185,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("auto_approve failed")
             raise HomeAssistantError(f"auto_approve failed: {err}") from err
 
+        if call.data["sync"]:
+            await _async_update_add_transaction_service_schema(hass, runtime_data)
+
     async def async_handle_sqlite_export(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
@@ -194,6 +197,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 full_refresh=call.data["full_refresh"],
                 quiet=call.data["quiet"],
             )
+            await _async_update_add_transaction_service_schema(hass, runtime_data)
         except Exception as err:
             LOGGER.exception("sqlite_export failed")
             raise HomeAssistantError(f"sqlite_export failed: {err}") from err
@@ -208,6 +212,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     full_refresh=False,
                     quiet=True,
                 )
+                await _async_update_add_transaction_service_schema(hass, runtime_data)
             result = await _api.run_sql_query(
                 Path(runtime_data.db_path),
                 call.data[ATTR_SQL],
@@ -234,23 +239,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 sync=call.data["sync"],
                 quiet=call.data["quiet"],
             )
+            if call.data["sync"]:
+                await _async_update_add_transaction_service_schema(hass, runtime_data)
         except Exception as err:
             LOGGER.exception("add_transaction failed")
             raise HomeAssistantError(f"add_transaction failed: {err}") from err
-
-    async def async_handle_add_transaction_options(
-        call: ServiceCall,
-    ) -> dict[str, object]:
-        del call
-        runtime_data = _get_runtime_data(hass)
-        try:
-            options = await _api.get_add_transaction_options(Path(runtime_data.db_path))
-            _set_add_transaction_service_schema(hass, options)
-        except Exception as err:
-            LOGGER.exception("add_transaction_options failed")
-            raise HomeAssistantError(f"add_transaction_options failed: {err}") from err
-
-        return options
 
     if not hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME):
         hass.services.async_register(
@@ -291,15 +284,6 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             SERVICE_ADD_TRANSACTION,
             async_handle_add_transaction,
             schema=ADD_TRANSACTION_SCHEMA,
-        )
-
-    if not hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION_OPTIONS):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_ADD_TRANSACTION_OPTIONS,
-            async_handle_add_transaction_options,
-            schema=ADD_TRANSACTION_OPTIONS_SCHEMA,
-            supports_response=SupportsResponse.ONLY,
         )
 
 

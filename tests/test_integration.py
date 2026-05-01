@@ -22,7 +22,6 @@ from homeassistant.exceptions import HomeAssistantError
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.pending_income import PendingIncomeResult
 
-from custom_components.ha_manager_for_ynab import ADD_TRANSACTION_OPTIONS_SCHEMA
 from custom_components.ha_manager_for_ynab import ADD_TRANSACTION_SCHEMA
 from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
 from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
@@ -39,7 +38,6 @@ from custom_components.ha_manager_for_ynab.config_flow import ManagerForYnabConf
 from custom_components.ha_manager_for_ynab.config_flow import _user_schema
 from custom_components.ha_manager_for_ynab.const import SERVICE_AUTO_APPROVE
 from custom_components.ha_manager_for_ynab.const import SERVICE_ADD_TRANSACTION
-from custom_components.ha_manager_for_ynab.const import SERVICE_ADD_TRANSACTION_OPTIONS
 from custom_components.ha_manager_for_ynab.const import CONF_DB_PATH
 from custom_components.ha_manager_for_ynab.const import CONF_TOKEN
 from custom_components.ha_manager_for_ynab.const import DOMAIN
@@ -276,7 +274,6 @@ def test_service_schemas_default_values() -> None:
         "sync": True,
         "quiet": False,
     }
-    assert ADD_TRANSACTION_OPTIONS_SCHEMA({}) == {}
 
 
 @patch("custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path")
@@ -401,46 +398,6 @@ async def test_api_run_sql_query_write(tmp_path: Path) -> None:
 
     with sqlite3.connect(db_path) as connection:
         assert connection.execute("select count(*) from budgets").fetchone() == (0,)
-
-
-@pytest.mark.asyncio
-async def test_api_get_add_transaction_options(tmp_path: Path) -> None:
-    db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'Checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-2', 'plan-1', 'Closed', 0, 1)"
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES ('category-1', 'plan-1', 'Bills', 'Electric', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES ('category-2', 'plan-1', 'Hidden', 'Stuff', 0, 1)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'Power Co', 0)"
-        )
-        connection.commit()
-
-    assert await _api.get_add_transaction_options(db_path) == {
-        "default_plan_name": "Budget",
-        "plans": ["Budget"],
-        "categories_by_plan": {"Budget": ["Bills - Electric"]},
-        "accounts_by_plan": {"Budget": ["Checking"]},
-        "payees_by_plan": {"Budget": ["Power Co"]},
-        "cleared": ["uncleared", "cleared", "reconciled"],
-    }
 
 
 @patch(
@@ -582,7 +539,6 @@ async def test_async_setup_registers_services() -> None:
     assert setup_ok is True
     assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
     assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION)
-    assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION_OPTIONS)
     assert hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
@@ -692,19 +648,11 @@ async def test_register_services_success_and_idempotence(
         "ServiceHandler",
         fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
     )
-    add_transaction_options = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION_OPTIONS)][
-            "handler"
-        ],
-    )
 
     await auto_approve(
-        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
+        FakeServiceCall(data={"for_real": True, "sync": True, "quiet": True})
     )
-    await pending(
-        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
-    )
+    await pending(FakeServiceCall(data={"for_real": True, "sync": True, "quiet": True}))
     await sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
     result = await sqlite_query(
         FakeServiceCall(
@@ -724,29 +672,27 @@ async def test_register_services_success_and_idempotence(
                 "date": datetime.date(2026, 5, 1),
                 "cleared": "uncleared",
                 "amount": Decimal("12.34"),
-                "sync": False,
+                "sync": True,
                 "quiet": True,
             }
         )
     )
-    options_result = await add_transaction_options(FakeServiceCall(data={}))
 
     assert result == {"rows": [{"id": 1}]}
-    assert options_result == {"plans": ["Budget"]}
-    assert len(fake_hass.services.registered) == 6
+    assert len(fake_hass.services.registered) == 5
     assert entry.runtime_data.pending_income_updated_count == 4
     run_auto_approve.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
-        sync=False,
+        sync=True,
         quiet=True,
     )
     run_pending_income.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
-        sync=False,
+        sync=True,
         quiet=True,
     )
     run_sqlite_export.assert_has_calls(
@@ -769,19 +715,15 @@ async def test_register_services_success_and_idempotence(
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
-        sync=False,
+        sync=True,
         quiet=True,
     )
-    get_add_transaction_options.assert_awaited_once_with(Path("/tmp/db.sqlite3"))
+    assert get_add_transaction_options.await_count == 5
+    get_add_transaction_options.assert_has_awaits([call(Path("/tmp/db.sqlite3"))] * 5)
 
 
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_sql_query",
-    new_callable=AsyncMock,
-    side_effect=RuntimeError("boom"),
-)
-@patch(
-    "custom_components.ha_manager_for_ynab._api.get_add_transaction_options",
     new_callable=AsyncMock,
     side_effect=RuntimeError("boom"),
 )
@@ -807,7 +749,6 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     run_pending_income: Mock,
     run_sqlite_export: Mock,
     run_add_transaction: Mock,
-    get_add_transaction_options: AsyncMock,
     run_sql_query: AsyncMock,
 ) -> None:
     del (
@@ -815,7 +756,6 @@ async def test_register_services_error_paths_raise_home_assistant_error(
         run_pending_income,
         run_sqlite_export,
         run_add_transaction,
-        get_add_transaction_options,
         run_sql_query,
     )
     fake_hass = FakeHass()
@@ -844,12 +784,6 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     add_transaction = cast(
         "ServiceHandler",
         fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
-    )
-    add_transaction_options = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION_OPTIONS)][
-            "handler"
-        ],
     )
 
     with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
@@ -884,8 +818,3 @@ async def test_register_services_error_paths_raise_home_assistant_error(
                 }
             )
         )
-
-    with pytest.raises(
-        HomeAssistantError, match="add_transaction_options failed: boom"
-    ):
-        await add_transaction_options(FakeServiceCall(data={}))

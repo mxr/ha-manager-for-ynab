@@ -64,11 +64,6 @@
       },
       "name": "Add transaction"
     },
-    "add_transaction_options": {
-      "description": "Return add-transaction form choices from the SQLite export.",
-      "fields": {},
-      "name": "Add transaction options"
-    },
     "auto_approve": {
       "description": "Run manager-for-ynab auto approve.",
       "fields": {

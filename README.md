@@ -66,10 +66,6 @@ This runs `sqlite-export-for-ynab` against the configured token and DB path.
 
 This executes the SQL against the configured SQLite DB path and returns rows as service response data.
 
-### `add_transaction_options`
-
-This returns current plans, accounts, payees, categories, and cleared statuses from the configured SQLite DB path. Categories are returned as `Category Group - Category Name`.
-
 ### `add_transaction`
 
 - `plan_name`: optional when the SQLite export has exactly one plan
@@ -82,4 +78,4 @@ This returns current plans, accounts, payees, categories, and cleared statuses f
 - `sync`: default `true`
 - `quiet`: default `false`
 
-This creates a transaction with `manager-for-ynab`'s add-transaction fund-moving helper. Dropdown values still come from the configured SQLite export.
+This creates a transaction with `manager-for-ynab`'s add-transaction fund-moving helper. Dropdown values still come from the configured SQLite export and refresh automatically after sync-capable actions.
