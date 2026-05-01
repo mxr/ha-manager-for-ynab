@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import aiosqlite
+from collections import defaultdict
 from manager_for_ynab.add_transaction import add_transaction_and_move_funds
 from manager_for_ynab.add_transaction import ResolvedAccount
 from manager_for_ynab.add_transaction import ResolvedCategory
@@ -269,11 +270,11 @@ async def _fetch_column(connection: aiosqlite.Connection, sql: str) -> list[str]
 async def _fetch_grouped_column(
     connection: aiosqlite.Connection, sql: str
 ) -> dict[str, list[str]]:
-    grouped: dict[str, list[str]] = {}
+    grouped: defaultdict[str, list[str]] = defaultdict(list)
     async with connection.execute(sql) as cursor:
         rows = await cursor.fetchall()
     for row in rows:
-        grouped.setdefault(str(row["plan_name"]), []).append(str(row["name"]))
+        grouped[str(row["plan_name"])].append(str(row["name"]))
     return grouped
 
 

@@ -74,22 +74,22 @@ add_transaction:
   fields:
     plan_name:
       required: false
-      example: Family Budget
+      example: My Budget
       selector:
         text:
     account_name:
       required: true
-      example: Checking
+      example: My Account
       selector:
         text:
     payee_name:
       required: true
-      example: Grocery Store
+      example: My Payee
       selector:
         text:
     category_name:
       required: false
-      example: Groceries - Groceries
+      example: My Category Group - My Category
       selector:
         text:
     date:
