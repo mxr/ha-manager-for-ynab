@@ -270,7 +270,7 @@ async def _fetch_column(connection: aiosqlite.Connection, sql: str) -> list[str]
 async def _fetch_grouped_column(
     connection: aiosqlite.Connection, sql: str
 ) -> dict[str, list[str]]:
-    grouped: defaultdict[str, list[str]] = defaultdict(list)
+    grouped: dict[str, list[str]] = defaultdict(list)
     async with connection.execute(sql) as cursor:
         rows = await cursor.fetchall()
     for row in rows:
