@@ -22,6 +22,53 @@
     }
   },
   "services": {
+    "add_transaction": {
+      "description": "Create a YNAB transaction using choices from the SQLite export.",
+      "fields": {
+        "account_name": {
+          "description": "Account name from the SQLite export.",
+          "name": "Account"
+        },
+        "amount": {
+          "description": "Transaction amount. Positive values are expenses.",
+          "name": "Amount"
+        },
+        "category_name": {
+          "description": "Category as category group and name separated by a hyphen.",
+          "name": "Category"
+        },
+        "cleared": {
+          "description": "Cleared status for the new transaction.",
+          "name": "Cleared"
+        },
+        "date": {
+          "description": "Transaction date.",
+          "name": "Date"
+        },
+        "payee_name": {
+          "description": "Payee name. Existing payees are resolved from the SQLite export.",
+          "name": "Payee"
+        },
+        "plan_name": {
+          "description": "Plan name from the SQLite export. Optional when only one plan exists.",
+          "name": "Plan"
+        },
+        "quiet": {
+          "description": "Suppress output from the underlying libraries.",
+          "name": "Quiet"
+        },
+        "sync": {
+          "description": "Sync the SQLite export before creating the transaction.",
+          "name": "Sync"
+        }
+      },
+      "name": "Add transaction"
+    },
+    "add_transaction_options": {
+      "description": "Return add-transaction form choices from the SQLite export.",
+      "fields": {},
+      "name": "Add transaction options"
+    },
     "auto_approve": {
       "description": "Run manager-for-ynab auto approve.",
       "fields": {
