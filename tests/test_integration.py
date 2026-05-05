@@ -586,12 +586,44 @@ async def test_register_services_success_and_idempotence(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
     side_effect=RuntimeError("boom"),
 )
+@pytest.mark.parametrize(
+    ("service_name", "data", "match"),
+    [
+        pytest.param(
+            SERVICE_PENDING_INCOME,
+            {"for_real": False, "sync": True, "quiet": False},
+            "pending_income failed: boom",
+            id=SERVICE_PENDING_INCOME,
+        ),
+        pytest.param(
+            SERVICE_AUTO_APPROVE,
+            {"for_real": False, "sync": True, "quiet": False},
+            "auto_approve failed: boom",
+            id=SERVICE_AUTO_APPROVE,
+        ),
+        pytest.param(
+            SERVICE_SQLITE_EXPORT,
+            {"full_refresh": False, "quiet": False},
+            "sqlite_export failed: boom",
+            id=SERVICE_SQLITE_EXPORT,
+        ),
+        pytest.param(
+            SERVICE_SQLITE_QUERY,
+            {"sync": False, "sql": "select 1"},
+            "sqlite_query failed: boom",
+            id=SERVICE_SQLITE_QUERY,
+        ),
+    ],
+)
 @pytest.mark.asyncio
 async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: Mock,
     run_pending_income: Mock,
     run_sqlite_export: Mock,
     run_sql_query: AsyncMock,
+    service_name: str,
+    data: dict[str, object],
+    match: str,
 ) -> None:
     del run_auto_approve, run_pending_income, run_sqlite_export, run_sql_query
     fake_hass = FakeHass()
@@ -601,37 +633,10 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     }
 
     await _async_register_services(hass)
-    pending = cast(
+    handler = cast(
         "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
-    )
-    auto_approve = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
-    )
-    sqlite_export = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
-    )
-    sqlite_query = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
+        fake_hass.services.registered[(DOMAIN, service_name)]["handler"],
     )
 
-    with pytest.raises(HomeAssistantError, match="auto_approve failed: boom"):
-        await auto_approve(
-            FakeServiceCall(data={"for_real": False, "sync": True, "quiet": False})
-        )
-
-    with pytest.raises(HomeAssistantError, match="pending_income failed: boom"):
-        await pending(
-            FakeServiceCall(data={"for_real": False, "sync": True, "quiet": False})
-        )
-
-    with pytest.raises(HomeAssistantError, match="sqlite_export failed: boom"):
-        await sqlite_export(
-            FakeServiceCall(data={"full_refresh": False, "quiet": False})
-        )
-
-    with pytest.raises(HomeAssistantError, match="sqlite_query failed: boom"):
-        await sqlite_query(FakeServiceCall(data={"sync": False, "sql": "select 1"}))
+    with pytest.raises(HomeAssistantError, match=match):
+        await handler(FakeServiceCall(data=data))
