@@ -541,29 +541,35 @@ async def test_api_run_add_transaction_raises_on_nonzero_result(
     add_transaction_and_move_funds.assert_awaited_once()
 
 
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    return_value=0,
+)
 @pytest.mark.asyncio
-async def test_api_run_add_transaction_rejects_transfer_category(
+async def test_api_run_add_transaction_ignores_transfer_category(
+    add_transaction_and_move_funds: AsyncMock,
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
     seed_db(db_path)
 
-    with pytest.raises(
-        ValueError, match="Category not allowed for transfer transactions"
-    ):
-        await _api.run_add_transaction(
-            "token",
-            db_path,
-            plan_name="Transfer Budget",
-            account_name="Checking",
-            payee_name="Transfer",
-            category_name="Bills - Electric",
-            date=datetime.date(2026, 5, 1),
-            cleared="uncleared",
-            amount=Decimal("12.34"),
-            sync=False,
-            quiet=False,
-        )
+    await _api.run_add_transaction(
+        "token",
+        db_path,
+        plan_name="Transfer Budget",
+        account_name="Checking",
+        payee_name="Transfer",
+        category_name="Bills - Electric",
+        date=datetime.date(2026, 5, 1),
+        cleared="uncleared",
+        amount=Decimal("12.34"),
+        sync=False,
+        quiet=False,
+    )
+
+    add_transaction_and_move_funds.assert_awaited_once()
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert resolved.category is None
 
 
 @pytest.mark.asyncio
@@ -778,9 +784,19 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
         in description["fields"]["account_name"]["selector"]["select"]["options"]
     )
     assert (
+        description["fields"]["account_name"]["selector"]["select"]["custom_value"]
+        is True
+    )
+    assert (
         "My Category Group - My Category"
         in description["fields"]["category_name"]["selector"]["select"]["options"]
     )
+    assert description["fields"]["category_name"]["required"] is True
+    assert (
+        description["fields"]["category_name"]["selector"]["select"]["custom_value"]
+        is True
+    )
+    assert description["fields"]["date"]["default"] == datetime.date.today().isoformat()
     assert (
         "My Payee"
         in description["fields"]["payee_name"]["selector"]["select"]["options"]

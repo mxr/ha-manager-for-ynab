@@ -209,9 +209,7 @@ async def _resolve_add_transaction(
             f"No payee named {payee_name!r} found in selected plan.",
         )
         category = None
-        if category_name:
-            if payee["transfer_account_id"] is not None:
-                raise ValueError("Category not allowed for transfer transactions")
+        if category_name and payee["transfer_account_id"] is None:
             category_row = await _fetch_one_row(
                 con,
                 """

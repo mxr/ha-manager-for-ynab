@@ -71,8 +71,8 @@ This executes the SQL against the configured SQLite DB path and returns rows as 
 - `plan_name`: optional when the SQLite export has exactly one plan
 - `account_name`: required
 - `payee_name`: required
-- `category_name`: optional, formatted as `Category Group - Category Name`
-- `date`: required
+- `category_name`: shown by default, formatted as `Category Group - Category Name`; ignored when the payee is another account, which makes the transaction a transfer
+- `date`: required, default today
 - `cleared`: default `uncleared`
 - `amount`: required, positive values are expenses
 - `sync`: default `true`

@@ -346,7 +346,13 @@ def _set_add_transaction_service_schema(
                     "name": "Account",
                     "description": "Account name from the SQLite export.",
                     "required": True,
-                    "selector": {"select": {"options": accounts, "mode": "dropdown"}},
+                    "selector": {
+                        "select": {
+                            "options": accounts,
+                            "custom_value": True,
+                            "mode": "dropdown",
+                        }
+                    },
                 },
                 ATTR_PAYEE_NAME: {
                     "name": "Payee",
@@ -362,14 +368,21 @@ def _set_add_transaction_service_schema(
                 },
                 ATTR_CATEGORY_NAME: {
                     "name": "Category",
-                    "description": "Category as category group and name separated by a hyphen.",
-                    "required": False,
-                    "selector": {"select": {"options": categories, "mode": "dropdown"}},
+                    "description": "Category as category group and name separated by a hyphen. Ignored when the payee is another account, which makes the transaction a transfer.",
+                    "required": True,
+                    "selector": {
+                        "select": {
+                            "options": categories,
+                            "custom_value": True,
+                            "mode": "dropdown",
+                        }
+                    },
                 },
                 ATTR_DATE: {
                     "name": "Date",
                     "description": "Transaction date.",
                     "required": True,
+                    "default": datetime.date.today().isoformat(),
                     "selector": {"date": {}},
                 },
                 ATTR_CLEARED: {

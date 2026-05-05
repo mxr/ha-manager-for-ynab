@@ -34,7 +34,7 @@
           "name": "Amount"
         },
         "category_name": {
-          "description": "Category as category group and name separated by a hyphen.",
+          "description": "Category as category group and name separated by a hyphen. Ignored when the payee is another account, which makes the transaction a transfer.",
           "name": "Category"
         },
         "cleared": {
