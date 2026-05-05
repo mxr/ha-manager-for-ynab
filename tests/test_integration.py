@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import datetime
 import sqlite3
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
@@ -16,10 +19,13 @@ import aiosqlite
 import pytest
 import voluptuous as vol
 from homeassistant.core import State
+from homeassistant.core import SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.service import async_get_cached_service_description
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.pending_income import PendingIncomeResult
 
+from custom_components.ha_manager_for_ynab import ADD_TRANSACTION_SCHEMA
 from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
 from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
 from custom_components.ha_manager_for_ynab import SQLITE_EXPORT_SCHEMA
@@ -28,14 +34,17 @@ from custom_components.ha_manager_for_ynab import RuntimeData
 from custom_components.ha_manager_for_ynab import _api
 from custom_components.ha_manager_for_ynab import _async_register_services
 from custom_components.ha_manager_for_ynab import _get_runtime_data
+from custom_components.ha_manager_for_ynab import _set_add_transaction_service_schema
 from custom_components.ha_manager_for_ynab import async_setup
 from custom_components.ha_manager_for_ynab import async_setup_entry
 from custom_components.ha_manager_for_ynab import async_unload_entry
 from custom_components.ha_manager_for_ynab.config_flow import ManagerForYnabConfigFlow
 from custom_components.ha_manager_for_ynab.config_flow import _user_schema
+from custom_components.ha_manager_for_ynab.const import CLEARED_OPTIONS
 from custom_components.ha_manager_for_ynab.const import CONF_DB_PATH
 from custom_components.ha_manager_for_ynab.const import CONF_TOKEN
 from custom_components.ha_manager_for_ynab.const import DOMAIN
+from custom_components.ha_manager_for_ynab.const import SERVICE_ADD_TRANSACTION
 from custom_components.ha_manager_for_ynab.const import SERVICE_AUTO_APPROVE
 from custom_components.ha_manager_for_ynab.const import SERVICE_PENDING_INCOME
 from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_EXPORT
@@ -45,6 +54,8 @@ from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
 )
 from tests.fixtures import config_entry_factory as config_entry_factory
+
+ADD_TRANSACTION_SEED = Path(__file__).parent / "sql" / "add_transaction" / "seed.sql"
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -58,6 +69,12 @@ if TYPE_CHECKING:
     ServiceHandler = Callable[[object], Coroutine[Any, Any, object | None]]
 
 
+def seed_db(db_path: Path) -> None:
+    with sqlite3.connect(db_path) as con:
+        con.executescript(ADD_TRANSACTION_SEED.read_text())
+        con.commit()
+
+
 class FakeServices:
     def __init__(self) -> None:
         self.registered: dict[
@@ -66,6 +83,17 @@ class FakeServices:
 
     def has_service(self, domain: str, service: str) -> bool:
         return (domain, service) in self.registered
+
+    def supports_response(self, domain: str, service: str) -> SupportsResponse:
+        registered = self.registered.get((domain, service))
+        if registered is None:
+            return SupportsResponse.NONE
+        supports_response = registered["supports_response"]
+        return (
+            SupportsResponse.NONE
+            if supports_response is None
+            else cast("SupportsResponse", supports_response)
+        )
 
     def async_register(
         self,
@@ -104,6 +132,19 @@ class FakeHass:
         self.data: dict[str, dict[str, RuntimeData]] = {}
         self.services = FakeServices()
         self.config_entries = FakeConfigEntries()
+        self.tasks: list[asyncio.Task[object]] = []
+
+    def async_create_task(
+        self, target: Coroutine[Any, Any, object], name: str | None = None
+    ) -> asyncio.Task[object]:
+        del name
+        task = asyncio.create_task(target)
+        self.tasks.append(task)
+        return task
+
+    async def async_block_till_done(self) -> None:
+        if self.tasks:
+            await asyncio.gather(*self.tasks)
 
 
 @dataclass
@@ -134,6 +175,13 @@ def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
 
     assert runtime_data.pending_income_updated_count == 3
     assert seen == [3]
+
+
+def test_fake_services_supports_response_defaults_to_none() -> None:
+    assert (
+        FakeServices().supports_response(DOMAIN, SERVICE_ADD_TRANSACTION)
+        == SupportsResponse.NONE
+    )
 
 
 def test_pending_income_sensor_reads_runtime_state() -> None:
@@ -244,6 +292,21 @@ def test_service_schemas_default_values() -> None:
     }
     assert SQLITE_EXPORT_SCHEMA({}) == {"full_refresh": False, "quiet": False}
     assert SQLITE_QUERY_SCHEMA({"sql": "select 1"}) == {"sync": True, "sql": "select 1"}
+    assert ADD_TRANSACTION_SCHEMA(
+        {
+            "account_name": "Checking",
+            "payee_name": "Store",
+            "amount": "12.34",
+        }
+    ) == {
+        "account_name": "Checking",
+        "payee_name": "Store",
+        "date": datetime.date.today(),
+        "cleared": "uncleared",
+        "amount": Decimal("12.34"),
+        "sync": True,
+        "quiet": False,
+    }
 
 
 @patch("custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path")
@@ -370,6 +433,247 @@ async def test_api_run_sql_query_write(tmp_path: Path) -> None:
         assert con.execute("select count(*) from budgets").fetchone() == (0,)
 
 
+@pytest.mark.asyncio
+async def test_api_get_add_transaction_options_multiple_plans(tmp_path: Path) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    options = await _api.get_add_transaction_options(db_path)
+
+    assert options["default_plan_name"] is None
+    assert {"Budget A", "Budget B"} <= set(options["plans"])
+    assert options["categories_by_plan"]["Budget A"] == ["Bills - Electric"]
+    assert options["categories_by_plan"]["Budget B"] == ["Food - Groceries"]
+    assert options["accounts_by_plan"]["Budget A"] == ["Checking A"]
+    assert options["accounts_by_plan"]["Budget B"] == ["Checking B"]
+    assert options["payees_by_plan"]["Budget A"] == ["Power Co"]
+    assert options["payees_by_plan"]["Budget B"] == ["Market Co"]
+    assert options["cleared"] == CLEARED_OPTIONS
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    new_callable=AsyncMock,
+    return_value=0,
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_sqlite_export",
+    new_callable=AsyncMock,
+)
+@pytest.mark.asyncio
+async def test_api_run_add_transaction(
+    run_sqlite_export: AsyncMock,
+    add_transaction_and_move_funds: AsyncMock,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    plan_id = "11111111-1111-1111-1111-111111111111"
+    account_id = "22222222-2222-2222-2222-222222222222"
+    payee_id = "33333333-3333-3333-3333-333333333333"
+    category_id = "44444444-4444-4444-4444-444444444444"
+    seed_db(db_path)
+
+    await _api.run_add_transaction(
+        "token",
+        db_path,
+        plan_name="Budget",
+        account_name="Checking",
+        payee_name="Power Co",
+        category_name="Bills - Electric",
+        date=datetime.date(2026, 5, 1),
+        cleared="uncleared",
+        amount=Decimal("12.34"),
+        sync=True,
+        quiet=True,
+    )
+
+    run_sqlite_export.assert_awaited_once_with(
+        "token", db_path, full_refresh=False, quiet=True
+    )
+    add_transaction_and_move_funds.assert_awaited_once()
+    assert add_transaction_and_move_funds.call_args.kwargs["token"] == "token"
+    assert add_transaction_and_move_funds.call_args.kwargs["db"] == db_path
+    assert add_transaction_and_move_funds.call_args.kwargs["for_real"] is True
+    assert add_transaction_and_move_funds.call_args.kwargs["quiet"] is True
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert resolved.plan.id == plan_id
+    assert resolved.plan.name == "Budget"
+    assert resolved.account.id == account_id
+    assert resolved.account.name == "Checking"
+    assert resolved.account.type == "checking"
+    assert resolved.payee.id == payee_id
+    assert resolved.payee.name == "Power Co"
+    assert resolved.category.id == category_id
+    assert resolved.category.name == "Electric"
+    assert resolved.date == datetime.date(2026, 5, 1)
+    assert resolved.amount == Decimal("12.34")
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    new_callable=AsyncMock,
+    return_value=1,
+)
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_raises_on_nonzero_result(
+    add_transaction_and_move_funds: AsyncMock, tmp_path: Path
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    with pytest.raises(
+        RuntimeError, match="manager-for-ynab add_transaction_and_move_funds failed"
+    ):
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name="Budget",
+            account_name="Checking",
+            payee_name="Power Co",
+            category_name="Bills - Electric",
+            date=datetime.date(2026, 5, 1),
+            cleared="uncleared",
+            amount=Decimal("12.34"),
+            sync=False,
+            quiet=False,
+        )
+
+    add_transaction_and_move_funds.assert_awaited_once()
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    return_value=0,
+)
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_ignores_transfer_category(
+    add_transaction_and_move_funds: AsyncMock,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    await _api.run_add_transaction(
+        "token",
+        db_path,
+        plan_name="Transfer Budget",
+        account_name="Checking",
+        payee_name="Transfer",
+        category_name="Bills - Electric",
+        date=datetime.date(2026, 5, 1),
+        cleared="uncleared",
+        amount=Decimal("12.34"),
+        sync=False,
+        quiet=False,
+    )
+
+    add_transaction_and_move_funds.assert_awaited_once()
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert resolved.category is None
+
+
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_missing_account_raises(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    with pytest.raises(
+        RuntimeError, match="No open account named 'Checking' found in selected plan"
+    ):
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name="Empty Budget",
+            account_name="Checking",
+            payee_name="Power Co",
+            category_name=None,
+            date=datetime.date(2026, 5, 1),
+            cleared="uncleared",
+            amount=Decimal("12.34"),
+            sync=False,
+            quiet=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_missing_plan_raises(tmp_path: Path) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    with pytest.raises(RuntimeError, match="No plan named 'Missing Budget' found"):
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name="Missing Budget",
+            account_name="Checking",
+            payee_name="Power Co",
+            category_name="Bills - Electric",
+            date=datetime.date(2026, 5, 1),
+            cleared="uncleared",
+            amount=Decimal("12.34"),
+            sync=False,
+            quiet=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_multiple_plans_requires_plan_name(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Plan name is required when SQLite export has multiple plans",
+    ):
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name=None,
+            account_name="Checking A",
+            payee_name="Power Co",
+            category_name=None,
+            date=datetime.date(2026, 5, 1),
+            cleared="uncleared",
+            amount=Decimal("12.34"),
+            sync=False,
+            quiet=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_explicit_plan_no_sync(tmp_path: Path) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    with patch(
+        "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+        new_callable=AsyncMock,
+        return_value=0,
+    ) as add_transaction_and_move_funds:
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name="Budget",
+            account_name="Checking",
+            payee_name="Power Co",
+            category_name=None,
+            date=datetime.date(2026, 5, 1),
+            cleared="cleared",
+            amount=Decimal("12.34"),
+            sync=False,
+            quiet=False,
+        )
+
+    add_transaction_and_move_funds.assert_awaited_once()
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert resolved.plan.name == "Budget"
+    assert resolved.category is None
+
+
 @patch.object(
     ManagerForYnabConfigFlow,
     "async_show_form",
@@ -428,6 +732,7 @@ async def test_async_setup_registers_services() -> None:
 
     assert setup_ok is True
     assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
+    assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION)
     assert hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
@@ -448,6 +753,82 @@ async def test_async_setup_and_unload_entry(
     assert unload_ok is True
     assert entry.runtime_data.token == "token"
     assert fake_hass.data[DOMAIN] == {}
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_refreshes_add_transaction_schema(
+    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+    tmp_path: Path,
+) -> None:
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
+    db_path = tmp_path / "ynab-schema.sqlite3"
+    seed_db(db_path)
+
+    await async_setup(hass, {})
+    entry = config_entry_factory(data={CONF_TOKEN: "token", CONF_DB_PATH: str(db_path)})
+
+    await async_setup_entry(hass, entry)
+    description = async_get_cached_service_description(
+        hass, DOMAIN, SERVICE_ADD_TRANSACTION
+    )
+
+    assert description is not None
+    assert "default" not in description["fields"]["plan_name"]
+    assert (
+        "My Budget"
+        in description["fields"]["plan_name"]["selector"]["select"]["options"]
+    )
+    assert (
+        "My Account"
+        in description["fields"]["account_name"]["selector"]["select"]["options"]
+    )
+    assert (
+        "custom_value"
+        not in description["fields"]["account_name"]["selector"]["select"]
+    )
+    assert (
+        "My Category Group - My Category"
+        in description["fields"]["category_name"]["selector"]["select"]["options"]
+    )
+    assert description["fields"]["category_name"]["required"] is True
+    assert (
+        "custom_value"
+        not in description["fields"]["category_name"]["selector"]["select"]
+    )
+    assert description["fields"]["date"]["default"] == datetime.date.today().isoformat()
+    assert (
+        "My Payee"
+        in description["fields"]["payee_name"]["selector"]["select"]["options"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_add_transaction_service_schema_handles_bad_options() -> None:
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
+    await async_setup(hass, {})
+
+    _set_add_transaction_service_schema(
+        hass,
+        {
+            "plans": "oops",
+            "accounts_by_plan": "oops",
+            "categories_by_plan": "oops",
+            "payees_by_plan": "oops",
+            "default_plan_name": "My Budget",
+        },
+    )
+    description = async_get_cached_service_description(
+        hass, DOMAIN, SERVICE_ADD_TRANSACTION
+    )
+
+    assert description is not None
+    assert description["fields"]["plan_name"]["default"] == "My Budget"
+    assert description["fields"]["plan_name"]["selector"]["select"]["options"] == []
+    assert description["fields"]["account_name"]["selector"]["select"]["options"] == []
+    assert description["fields"]["category_name"]["selector"]["select"]["options"] == []
+    assert description["fields"]["payee_name"]["selector"]["select"]["options"] == []
 
 
 @pytest.mark.asyncio
@@ -480,6 +861,14 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
     return_value={"rows": [{"id": 1}]},
 )
 @patch(
+    "custom_components.ha_manager_for_ynab._api.get_add_transaction_options",
+    new_callable=AsyncMock,
+    return_value={"plans": ["Budget"]},
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_add_transaction", return_value=None
+)
+@patch(
     "custom_components.ha_manager_for_ynab._api.run_sqlite_export", return_value=None
 )
 @patch(
@@ -495,6 +884,8 @@ async def test_register_services_success_and_idempotence(
     run_auto_approve: Mock,
     run_pending_income: Mock,
     run_sqlite_export: Mock,
+    run_add_transaction: Mock,
+    get_add_transaction_options: AsyncMock,
     run_sql_query: AsyncMock,
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
 ) -> None:
@@ -523,13 +914,15 @@ async def test_register_services_success_and_idempotence(
         "ServiceHandler",
         fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
     )
+    add_transaction = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
+    )
 
     await auto_approve(
-        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
+        FakeServiceCall(data={"for_real": True, "sync": True, "quiet": True})
     )
-    await pending(
-        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
-    )
+    await pending(FakeServiceCall(data={"for_real": True, "sync": True, "quiet": True}))
     await sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
     result = await sqlite_query(
         FakeServiceCall(
@@ -539,22 +932,39 @@ async def test_register_services_success_and_idempotence(
             }
         )
     )
+    await add_transaction(
+        FakeServiceCall(
+            data={
+                "plan_name": "Budget",
+                "account_name": "Checking",
+                "payee_name": "Store",
+                "category_name": "Food - Groceries",
+                "date": datetime.date(2026, 5, 1),
+                "cleared": "uncleared",
+                "amount": Decimal("12.34"),
+                "sync": True,
+                "quiet": True,
+            }
+        )
+    )
+
+    await fake_hass.async_block_till_done()
 
     assert result == {"rows": [{"id": 1}]}
-    assert len(fake_hass.services.registered) == 4
+    assert len(fake_hass.services.registered) == 5
     assert entry.runtime_data.pending_income_updated_count == 4
     run_auto_approve.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
-        sync=False,
+        sync=True,
         quiet=True,
     )
     run_pending_income.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
         for_real=True,
-        sync=False,
+        sync=True,
         quiet=True,
     )
     run_sqlite_export.assert_has_calls(
@@ -567,11 +977,30 @@ async def test_register_services_success_and_idempotence(
         Path("/tmp/db.sqlite3"),
         "select 1",
     )
+    run_add_transaction.assert_called_once_with(
+        "token",
+        Path("/tmp/db.sqlite3"),
+        plan_name="Budget",
+        account_name="Checking",
+        payee_name="Store",
+        category_name="Food - Groceries",
+        date=datetime.date(2026, 5, 1),
+        cleared="uncleared",
+        amount=Decimal("12.34"),
+        sync=True,
+        quiet=True,
+    )
+    assert get_add_transaction_options.await_count == 5
+    get_add_transaction_options.assert_has_awaits([call(Path("/tmp/db.sqlite3"))] * 5)
 
 
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_sql_query",
     new_callable=AsyncMock,
+    side_effect=RuntimeError("boom"),
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_add_transaction",
     side_effect=RuntimeError("boom"),
 )
 @patch(
@@ -613,6 +1042,20 @@ async def test_register_services_success_and_idempotence(
             "sqlite_query failed: boom",
             id=SERVICE_SQLITE_QUERY,
         ),
+        pytest.param(
+            SERVICE_ADD_TRANSACTION,
+            {
+                "account_name": "Checking",
+                "payee_name": "Store",
+                "date": datetime.date(2026, 5, 1),
+                "cleared": "uncleared",
+                "amount": Decimal("12.34"),
+                "sync": False,
+                "quiet": True,
+            },
+            "add_transaction failed: boom",
+            id=SERVICE_ADD_TRANSACTION,
+        ),
     ],
 )
 @pytest.mark.asyncio
@@ -620,12 +1063,19 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: Mock,
     run_pending_income: Mock,
     run_sqlite_export: Mock,
+    run_add_transaction: Mock,
     run_sql_query: AsyncMock,
     service_name: str,
     data: dict[str, object],
     match: str,
 ) -> None:
-    del run_auto_approve, run_pending_income, run_sqlite_export, run_sql_query
+    del (
+        run_auto_approve,
+        run_pending_income,
+        run_sqlite_export,
+        run_add_transaction,
+        run_sql_query,
+    )
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     fake_hass.data[DOMAIN] = {

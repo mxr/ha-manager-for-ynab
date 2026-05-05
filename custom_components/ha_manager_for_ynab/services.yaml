@@ -69,3 +69,61 @@ sqlite_query:
       selector:
         text:
           multiline: true
+
+add_transaction:
+  fields:
+    plan_name:
+      required: false
+      example: My Budget
+      selector:
+        text:
+    account_name:
+      required: true
+      example: My Account
+      selector:
+        text:
+    payee_name:
+      required: true
+      example: My Payee
+      selector:
+        text:
+    category_name:
+      required: true
+      example: My Category Group - My Category
+      description: Category is ignored when the payee is another account, which makes the transaction a transfer.
+      selector:
+        text:
+    date:
+      required: true
+      example: '2026-05-01'
+      selector:
+        date:
+    cleared:
+      required: true
+      default: uncleared
+      example: uncleared
+      selector:
+        select:
+          options:
+          - uncleared
+          - cleared
+          - reconciled
+    amount:
+      required: true
+      example: 12.34
+      selector:
+        number:
+          mode: box
+          step: 0.01
+    sync:
+      required: true
+      example: true
+      default: true
+      selector:
+        boolean:
+    quiet:
+      required: true
+      example: false
+      default: false
+      selector:
+        boolean:

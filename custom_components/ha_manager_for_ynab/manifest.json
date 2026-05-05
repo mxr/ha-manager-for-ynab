@@ -10,6 +10,7 @@
   "name": "Manager for YNAB",
   "requirements": [
     "aiosqlite>=0.21.0",
+    "asyncio-for-ynab>=1.83.0",
     "manager-for-ynab>=1.6.3",
     "sqlite-export-for-ynab>=2.7.0"
   ],

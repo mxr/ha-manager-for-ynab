@@ -10,6 +10,7 @@ Manager for YNAB is a Home Assistant custom integration for running `manager-for
 - `pending_income` action with `for_real`, `sync`, and `quiet`
 - `sqlite_export` action with `full_refresh` and `quiet`
 - `sqlite_query` action with arbitrary SQL and optional sync
+- `add_transaction` action with values resolved from the SQLite export
 - Sensor for the latest `pending_income` updated count
 
 If the configured DB path is empty, the integration uses `sqlite-export-for-ynab`'s default database path.
@@ -64,3 +65,17 @@ This runs `sqlite-export-for-ynab` against the configured token and DB path.
 - `sync`: default `true`
 
 This executes the SQL against the configured SQLite DB path and returns rows as service response data.
+
+### `add_transaction`
+
+- `plan_name`: optional when the SQLite export has exactly one plan
+- `account_name`: required
+- `payee_name`: required
+- `category_name`: shown by default, formatted as `Category Group - Category Name`; ignored when the payee is another account, which makes the transaction a transfer
+- `date`: required, default today
+- `cleared`: default `uncleared`
+- `amount`: required, positive values are expenses
+- `sync`: default `true`
+- `quiet`: default `false`
+
+This creates a transaction with `manager-for-ynab`'s add-transaction fund-moving helper. Dropdown values still come from the configured SQLite export and refresh automatically after sync-capable actions.

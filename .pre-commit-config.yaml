@@ -32,8 +32,14 @@ repos:
   - id: ruff-check
     args: [--fix]
   - id: ruff-format
+- repo: https://github.com/sqlfluff/sqlfluff
+  rev: 4.1.0
+  hooks:
+  - id: sqlfluff-fix
+    args: [--dialect, sqlite]
+
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: v1.20.2
   hooks:
   - id: mypy
-    additional_dependencies: [aiosqlite>=0.21.0, homeassistant-stubs, manager-for-ynab>=1.6.3, sqlite-export-for-ynab>=2.7.0]
+    additional_dependencies: [aiosqlite>=0.21.0, asyncio-for-ynab>=1.83.0, homeassistant-stubs, manager-for-ynab>=1.6.3, sqlite-export-for-ynab>=2.7.0]
