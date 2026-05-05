@@ -13,7 +13,7 @@ from manager_for_ynab.add_transaction import ResolvedTransaction
 from manager_for_ynab.auto_approve import AutoApproveResult, auto_approve
 from manager_for_ynab.pending_income import pending_income, PendingIncomeResult
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
-from ynab.models.transaction_cleared_status import TransactionClearedStatus
+from asyncio_for_ynab import TransactionClearedStatus
 
 from typing import TYPE_CHECKING
 from typing import Any
