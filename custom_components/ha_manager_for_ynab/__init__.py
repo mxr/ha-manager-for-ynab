@@ -349,7 +349,6 @@ def _set_add_transaction_service_schema(
                     "selector": {
                         "select": {
                             "options": accounts,
-                            "custom_value": True,
                             "mode": "dropdown",
                         }
                     },
@@ -373,7 +372,6 @@ def _set_add_transaction_service_schema(
                     "selector": {
                         "select": {
                             "options": categories,
-                            "custom_value": True,
                             "mode": "dropdown",
                         }
                     },

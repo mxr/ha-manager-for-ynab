@@ -784,8 +784,8 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
         in description["fields"]["account_name"]["selector"]["select"]["options"]
     )
     assert (
-        description["fields"]["account_name"]["selector"]["select"]["custom_value"]
-        is True
+        "custom_value"
+        not in description["fields"]["account_name"]["selector"]["select"]
     )
     assert (
         "My Category Group - My Category"
@@ -793,8 +793,8 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     )
     assert description["fields"]["category_name"]["required"] is True
     assert (
-        description["fields"]["category_name"]["selector"]["select"]["custom_value"]
-        is True
+        "custom_value"
+        not in description["fields"]["category_name"]["selector"]["select"]
     )
     assert description["fields"]["date"]["default"] == datetime.date.today().isoformat()
     assert (
