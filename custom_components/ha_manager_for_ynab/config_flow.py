@@ -5,10 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
-
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.config_entries import ConfigFlowResult
+from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
 
 from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
