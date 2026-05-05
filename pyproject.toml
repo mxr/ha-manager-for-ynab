@@ -61,4 +61,10 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", *manifest["requir
 ''',
   ],
 ]
-deps = "-rrequirements-dev.txt"
+deps = [
+  "covdefaults",
+  "coverage",
+  "homeassistant",
+  "pytest",
+  "pytest-asyncio",
+]
