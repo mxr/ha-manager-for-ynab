@@ -110,15 +110,15 @@ async def run_add_transaction(
 async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
     """Return current add-transaction form choices from the SQLite export."""
 
-    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
-        connection.row_factory = aiosqlite.Row
+    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as con:
+        con.row_factory = aiosqlite.Row
 
         plans = await _fetch_column(
-            connection,
+            con,
             "SELECT name FROM plans ORDER BY LOWER(name)",
         )
         categories = await _fetch_grouped_column(
-            connection,
+            con,
             """
             SELECT p.name AS plan_name, c.category_group_name || ' - ' || c.name AS name
             FROM categories AS c
@@ -128,7 +128,7 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
             """,
         )
         accounts = await _fetch_grouped_column(
-            connection,
+            con,
             """
             SELECT p.name AS plan_name, a.name
             FROM accounts AS a
@@ -138,7 +138,7 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
             """,
         )
         payees = await _fetch_grouped_column(
-            connection,
+            con,
             """
             SELECT p.name AS plan_name, payees.name
             FROM payees
@@ -161,15 +161,15 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
 async def run_sql_query(db_path: Path, sql: str) -> dict[str, Any]:
     """Execute a SQL query (multiple statements) against the configured SQLite database."""
 
-    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
-        connection.row_factory = aiosqlite.Row
+    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as con:
+        con.row_factory = aiosqlite.Row
 
         rows: list[dict[str, Any]] = []
         for raw_statement in sql.split(";"):
             if statement := raw_statement.strip():
-                async with connection.execute(statement) as cursor:
-                    if cursor.description is not None:
-                        rows.extend(dict(row) for row in await cursor.fetchall())
+                async with con.execute(statement) as cur:
+                    if cur.description is not None:
+                        rows.extend(dict(row) for row in await cur.fetchall())
 
         return {"rows": rows} if rows else {}
 
@@ -185,11 +185,11 @@ async def _resolve_add_transaction(
     cleared: str,
     amount: Decimal,
 ) -> ResolvedTransaction:
-    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
-        connection.row_factory = aiosqlite.Row
-        plan = await _resolve_plan(connection, plan_name)
+    async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as con:
+        con.row_factory = aiosqlite.Row
+        plan = await _resolve_plan(con, plan_name)
         account = await _fetch_one_row(
-            connection,
+            con,
             """
             SELECT id, name, type
             FROM accounts
@@ -199,7 +199,7 @@ async def _resolve_add_transaction(
             f"No open account named {account_name!r} found in selected plan.",
         )
         payee = await _fetch_one_row(
-            connection,
+            con,
             """
             SELECT id, name, transfer_account_id
             FROM payees
@@ -213,7 +213,7 @@ async def _resolve_add_transaction(
             if payee["transfer_account_id"] is not None:
                 raise ValueError("Category not allowed for transfer transactions")
             category_row = await _fetch_one_row(
-                connection,
+                con,
                 """
                 SELECT id, name
                 FROM categories
@@ -243,21 +243,19 @@ async def _resolve_add_transaction(
 
 
 async def _resolve_plan(
-    connection: aiosqlite.Connection, plan_name: str | None
+    con: aiosqlite.Connection, plan_name: str | None
 ) -> ResolvedPlan:
     if plan_name:
         row = await _fetch_one_row(
-            connection,
+            con,
             "SELECT id, name FROM plans WHERE name = ?",
             (plan_name,),
             f"No plan named {plan_name!r} found.",
         )
         return ResolvedPlan(id=str(row["id"]), name=str(row["name"]))
 
-    async with connection.execute(
-        "SELECT id, name FROM plans ORDER BY LOWER(name)"
-    ) as cursor:
-        rows = list(await cursor.fetchall())
+    async with con.execute("SELECT id, name FROM plans ORDER BY LOWER(name)") as cur:
+        rows = list(await cur.fetchall())
     if len(rows) == 1:
         return ResolvedPlan(id=str(rows[0]["id"]), name=str(rows[0]["name"]))
     if not rows:
@@ -265,31 +263,31 @@ async def _resolve_plan(
     raise RuntimeError("Plan name is required when SQLite export has multiple plans.")
 
 
-async def _fetch_column(connection: aiosqlite.Connection, sql: str) -> list[str]:
-    async with connection.execute(sql) as cursor:
-        rows = await cursor.fetchall()
+async def _fetch_column(con: aiosqlite.Connection, sql: str) -> list[str]:
+    async with con.execute(sql) as cur:
+        rows = await cur.fetchall()
     return [str(row[0]) for row in rows]
 
 
 async def _fetch_grouped_column(
-    connection: aiosqlite.Connection, sql: str
+    con: aiosqlite.Connection, sql: str
 ) -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = defaultdict(list)
-    async with connection.execute(sql) as cursor:
-        rows = await cursor.fetchall()
+    async with con.execute(sql) as cur:
+        rows = await cur.fetchall()
     for row in rows:
         grouped[str(row["plan_name"])].append(str(row["name"]))
     return grouped
 
 
 async def _fetch_one_row(
-    connection: aiosqlite.Connection,
+    con: aiosqlite.Connection,
     sql: str,
     params: tuple[str, ...],
     error_message: str,
 ) -> Any:
-    async with connection.execute(sql, params) as cursor:
-        row = await cursor.fetchone()
+    async with con.execute(sql, params) as cur:
+        row = await cur.fetchone()
     if row is None:
         raise RuntimeError(error_message)
     return row

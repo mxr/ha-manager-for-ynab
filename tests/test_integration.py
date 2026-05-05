@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 import sqlite3
 from dataclasses import dataclass
@@ -131,6 +132,19 @@ class FakeHass:
         self.data: dict[str, dict[str, RuntimeData]] = {}
         self.services = FakeServices()
         self.config_entries = FakeConfigEntries()
+        self.tasks: list[asyncio.Task[object]] = []
+
+    def async_create_task(
+        self, target: Coroutine[Any, Any, object], name: str | None = None
+    ) -> asyncio.Task[object]:
+        del name
+        task = asyncio.create_task(target)
+        self.tasks.append(task)
+        return task
+
+    async def async_block_till_done(self) -> None:
+        if self.tasks:
+            await asyncio.gather(*self.tasks)
 
 
 @dataclass
@@ -917,6 +931,8 @@ async def test_register_services_success_and_idempotence(
             }
         )
     )
+
+    await fake_hass.async_block_till_done()
 
     assert result == {"rows": [{"id": 1}]}
     assert len(fake_hass.services.registered) == 5

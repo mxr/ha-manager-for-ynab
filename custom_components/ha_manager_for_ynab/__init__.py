@@ -138,7 +138,7 @@ async def async_setup_entry(
         token=entry.data[CONF_TOKEN], db_path=entry.data[CONF_DB_PATH]
     )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.runtime_data
-    await _async_update_add_transaction_service_schema(hass, entry.runtime_data)
+    await _update_add_transaction_service_schema(hass, entry.runtime_data)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -172,7 +172,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
         runtime_data.async_set_pending_income_updated_count(result.updated_count)
         if call.data["sync"]:
-            await _async_update_add_transaction_service_schema(hass, runtime_data)
+            _schedule_update_add_transaction_service_schema(hass, runtime_data)
 
     async def async_handle_auto_approve(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
@@ -189,7 +189,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(f"auto_approve failed: {err}") from err
 
         if call.data["sync"]:
-            await _async_update_add_transaction_service_schema(hass, runtime_data)
+            _schedule_update_add_transaction_service_schema(hass, runtime_data)
 
     async def async_handle_sqlite_export(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
@@ -200,7 +200,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 full_refresh=call.data["full_refresh"],
                 quiet=call.data["quiet"],
             )
-            await _async_update_add_transaction_service_schema(hass, runtime_data)
+            _schedule_update_add_transaction_service_schema(hass, runtime_data)
         except Exception as err:
             LOGGER.exception("sqlite_export failed")
             raise HomeAssistantError(f"sqlite_export failed: {err}") from err
@@ -215,7 +215,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     full_refresh=False,
                     quiet=True,
                 )
-                await _async_update_add_transaction_service_schema(hass, runtime_data)
+                _schedule_update_add_transaction_service_schema(hass, runtime_data)
             result = await _api.run_sql_query(
                 Path(runtime_data.db_path),
                 call.data[ATTR_SQL],
@@ -243,7 +243,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 quiet=call.data["quiet"],
             )
             if call.data["sync"]:
-                await _async_update_add_transaction_service_schema(hass, runtime_data)
+                _schedule_update_add_transaction_service_schema(hass, runtime_data)
         except Exception as err:
             LOGGER.exception("add_transaction failed")
             raise HomeAssistantError(f"add_transaction failed: {err}") from err
@@ -290,7 +290,17 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         )
 
 
-async def _async_update_add_transaction_service_schema(
+@callback
+def _schedule_update_add_transaction_service_schema(
+    hass: HomeAssistant, runtime_data: RuntimeData
+) -> None:
+    hass.async_create_task(
+        _update_add_transaction_service_schema(hass, runtime_data),
+        "ha_manager_for_ynab update add_transaction schema",
+    )
+
+
+async def _update_add_transaction_service_schema(
     hass: HomeAssistant, runtime_data: RuntimeData
 ) -> None:
     """Update add-transaction service dropdowns from the current SQLite export."""
