@@ -70,9 +70,9 @@ if TYPE_CHECKING:
 
 
 def seed_db(db_path: Path) -> None:
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(ADD_TRANSACTION_SEED.read_text())
-        connection.commit()
+    with sqlite3.connect(db_path) as con:
+        con.executescript(ADD_TRANSACTION_SEED.read_text())
+        con.commit()
 
 
 class FakeServices:
@@ -395,11 +395,11 @@ async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) ->
 @pytest.mark.asyncio
 async def test_api_run_sql_query(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.execute("create table budgets (id integer, name text)")
-        connection.execute("insert into budgets values (1, 'Home')")
-        connection.execute("insert into budgets values (2, 'Travel')")
-        connection.commit()
+    with sqlite3.connect(db_path) as con:
+        con.execute("create table budgets (id integer, name text)")
+        con.execute("insert into budgets values (1, 'Home')")
+        con.execute("insert into budgets values (2, 'Travel')")
+        con.commit()
 
     assert await _api.run_sql_query(
         db_path, "select id, name from budgets order by id"
@@ -422,15 +422,15 @@ async def test_api_run_sql_query(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_api_run_sql_query_write(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.execute("create table budgets (id integer, name text)")
-        connection.commit()
+    with sqlite3.connect(db_path) as con:
+        con.execute("create table budgets (id integer, name text)")
+        con.commit()
 
     with pytest.raises(aiosqlite.DatabaseError):
         await _api.run_sql_query(db_path, "insert into budgets values (1, 'Home')")
 
-    with sqlite3.connect(db_path) as connection:
-        assert connection.execute("select count(*) from budgets").fetchone() == (0,)
+    with sqlite3.connect(db_path) as con:
+        assert con.execute("select count(*) from budgets").fetchone() == (0,)
 
 
 @pytest.mark.asyncio
