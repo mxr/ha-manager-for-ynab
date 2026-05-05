@@ -3,43 +3,43 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-from typing import TYPE_CHECKING
-from typing import cast
-from unittest.mock import AsyncMock
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import call
-from unittest.mock import patch
+from typing import TYPE_CHECKING, Any, cast
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
+import aiosqlite
 import pytest
 import voluptuous as vol
-import aiosqlite
 from homeassistant.core import State
 from homeassistant.exceptions import HomeAssistantError
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.pending_income import PendingIncomeResult
 
-from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
-from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
-from custom_components.ha_manager_for_ynab import SQLITE_QUERY_SCHEMA
-from custom_components.ha_manager_for_ynab import SQLITE_EXPORT_SCHEMA
-from custom_components.ha_manager_for_ynab import RuntimeData
-from custom_components.ha_manager_for_ynab import _api
-from custom_components.ha_manager_for_ynab import async_setup
-from custom_components.ha_manager_for_ynab import _get_runtime_data
-from custom_components.ha_manager_for_ynab import _async_register_services
-from custom_components.ha_manager_for_ynab import async_setup_entry
-from custom_components.ha_manager_for_ynab import async_unload_entry
-from custom_components.ha_manager_for_ynab.config_flow import ManagerForYnabConfigFlow
-from custom_components.ha_manager_for_ynab.config_flow import _user_schema
-from custom_components.ha_manager_for_ynab.const import SERVICE_AUTO_APPROVE
-from custom_components.ha_manager_for_ynab.const import CONF_DB_PATH
-from custom_components.ha_manager_for_ynab.const import CONF_TOKEN
-from custom_components.ha_manager_for_ynab.const import DOMAIN
-from custom_components.ha_manager_for_ynab.const import SERVICE_PENDING_INCOME
-from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_EXPORT
-from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_QUERY
+from custom_components.ha_manager_for_ynab import (
+    AUTO_APPROVE_SCHEMA,
+    PENDING_INCOME_SCHEMA,
+    SQLITE_EXPORT_SCHEMA,
+    SQLITE_QUERY_SCHEMA,
+    RuntimeData,
+    _api,
+    _async_register_services,
+    _get_runtime_data,
+    async_setup,
+    async_setup_entry,
+    async_unload_entry,
+)
+from custom_components.ha_manager_for_ynab.config_flow import (
+    ManagerForYnabConfigFlow,
+    _user_schema,
+)
+from custom_components.ha_manager_for_ynab.const import (
+    CONF_DB_PATH,
+    CONF_TOKEN,
+    DOMAIN,
+    SERVICE_AUTO_APPROVE,
+    SERVICE_PENDING_INCOME,
+    SERVICE_SQLITE_EXPORT,
+    SERVICE_SQLITE_QUERY,
+)
 from custom_components.ha_manager_for_ynab.sensor import PendingIncomeUpdatedCountSensor
 from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
@@ -47,8 +47,7 @@ from custom_components.ha_manager_for_ynab.sensor import (
 from tests.fixtures import config_entry_factory as config_entry_factory
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from collections.abc import Coroutine
+    from collections.abc import Callable, Coroutine
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
