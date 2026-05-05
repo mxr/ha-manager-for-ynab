@@ -20,6 +20,8 @@ from manager_for_ynab.pending_income import PendingIncomeResult
 from manager_for_ynab.pending_income import pending_income
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
 
+from .const import CLEARED_OPTIONS
+
 if TYPE_CHECKING:
     import datetime
     from decimal import Decimal
@@ -152,7 +154,7 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
         "categories_by_plan": categories,
         "accounts_by_plan": accounts,
         "payees_by_plan": payees,
-        "cleared": ["uncleared", "cleared", "reconciled"],
+        "cleared": CLEARED_OPTIONS,
     }
 
 

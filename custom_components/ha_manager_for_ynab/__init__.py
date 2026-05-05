@@ -28,6 +28,8 @@ from .const import ATTR_DATE
 from .const import ATTR_PAYEE_NAME
 from .const import ATTR_PLAN_NAME
 from .const import ATTR_SQL
+from .const import CLEARED_DEFAULT
+from .const import CLEARED_OPTIONS
 from .const import CONF_DB_PATH
 from .const import CONF_TOKEN
 from .const import DOMAIN
@@ -81,9 +83,7 @@ ADD_TRANSACTION_SCHEMA = vol.Schema(
         vol.Required(
             ATTR_DATE, default=lambda: datetime.date.today().isoformat()
         ): vol.Coerce(datetime.date.fromisoformat),
-        vol.Required(ATTR_CLEARED, default="uncleared"): vol.In(
-            ["uncleared", "cleared", "reconciled"]
-        ),
+        vol.Required(ATTR_CLEARED, default=CLEARED_DEFAULT): vol.In(CLEARED_OPTIONS),
         vol.Required(ATTR_AMOUNT): vol.Coerce(lambda value: Decimal(str(value))),
         vol.Required("sync", default=True): cv.boolean,
         vol.Required("quiet", default=False): cv.boolean,
@@ -366,10 +366,10 @@ def _set_add_transaction_service_schema(
                     "name": "Cleared",
                     "description": "Cleared status for the new transaction.",
                     "required": True,
-                    "default": "uncleared",
+                    "default": CLEARED_DEFAULT,
                     "selector": {
                         "select": {
-                            "options": ["uncleared", "cleared", "reconciled"],
+                            "options": CLEARED_OPTIONS,
                             "mode": "dropdown",
                         }
                     },

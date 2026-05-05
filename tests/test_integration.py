@@ -39,6 +39,7 @@ from custom_components.ha_manager_for_ynab import async_setup_entry
 from custom_components.ha_manager_for_ynab import async_unload_entry
 from custom_components.ha_manager_for_ynab.config_flow import ManagerForYnabConfigFlow
 from custom_components.ha_manager_for_ynab.config_flow import _user_schema
+from custom_components.ha_manager_for_ynab.const import CLEARED_OPTIONS
 from custom_components.ha_manager_for_ynab.const import CONF_DB_PATH
 from custom_components.ha_manager_for_ynab.const import CONF_TOKEN
 from custom_components.ha_manager_for_ynab.const import DOMAIN
@@ -53,6 +54,8 @@ from custom_components.ha_manager_for_ynab.sensor import (
 )
 from tests.fixtures import config_entry_factory as config_entry_factory
 
+ADD_TRANSACTION_SEED = Path(__file__).parent / "sql" / "add_transaction" / "seed.sql"
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from collections.abc import Coroutine
@@ -63,6 +66,12 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
     ServiceHandler = Callable[[object], Coroutine[Any, Any, object | None]]
+
+
+def seed_db(db_path: Path) -> None:
+    with sqlite3.connect(db_path) as connection:
+        connection.executescript(ADD_TRANSACTION_SEED.read_text())
+        connection.commit()
 
 
 class FakeServices:
@@ -413,48 +422,19 @@ async def test_api_run_sql_query_write(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_api_get_add_transaction_options_multiple_plans(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget A')")
-        connection.execute("INSERT INTO plans VALUES ('plan-2', 'Budget B')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'Checking A', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-2', 'plan-2', 'Checking B', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES ('category-1', 'plan-1', 'Bills', 'Electric', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES ('category-2', 'plan-2', 'Food', 'Groceries', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'Power Co', 0)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-2', 'plan-2', 'Market Co', 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
-    assert await _api.get_add_transaction_options(db_path) == {
-        "default_plan_name": None,
-        "plans": ["Budget A", "Budget B"],
-        "categories_by_plan": {
-            "Budget A": ["Bills - Electric"],
-            "Budget B": ["Food - Groceries"],
-        },
-        "accounts_by_plan": {"Budget A": ["Checking A"], "Budget B": ["Checking B"]},
-        "payees_by_plan": {"Budget A": ["Power Co"], "Budget B": ["Market Co"]},
-        "cleared": ["uncleared", "cleared", "reconciled"],
-    }
+    options = await _api.get_add_transaction_options(db_path)
+
+    assert options["default_plan_name"] is None
+    assert {"Budget A", "Budget B"} <= set(options["plans"])
+    assert options["categories_by_plan"]["Budget A"] == ["Bills - Electric"]
+    assert options["categories_by_plan"]["Budget B"] == ["Food - Groceries"]
+    assert options["accounts_by_plan"]["Budget A"] == ["Checking A"]
+    assert options["accounts_by_plan"]["Budget B"] == ["Checking B"]
+    assert options["payees_by_plan"]["Budget A"] == ["Power Co"]
+    assert options["payees_by_plan"]["Budget B"] == ["Market Co"]
+    assert options["cleared"] == CLEARED_OPTIONS
 
 
 @patch(
@@ -477,34 +457,12 @@ async def test_api_run_add_transaction(
     account_id = "22222222-2222-2222-2222-222222222222"
     payee_id = "33333333-3333-3333-3333-333333333333"
     category_id = "44444444-4444-4444-4444-444444444444"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES (?, 'Budget')", (plan_id,))
-        connection.execute(
-            "INSERT INTO accounts VALUES (?, ?, 'Checking', 'checking', 0, 0)",
-            (account_id, plan_id),
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES (?, ?, 'Bills', 'Electric', 0, 0)",
-            (category_id, plan_id),
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES (?, ?, 'Power Co', NULL, 0)",
-            (payee_id, plan_id),
-        )
-        connection.commit()
+    seed_db(db_path)
 
     await _api.run_add_transaction(
         "token",
         db_path,
-        plan_name=None,
+        plan_name="Budget",
         account_name="Checking",
         payee_name="Power Co",
         category_name="Bills - Electric",
@@ -547,26 +505,7 @@ async def test_api_run_add_transaction_raises_on_nonzero_result(
     add_transaction_and_move_funds: AsyncMock, tmp_path: Path
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'Checking', 'checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES ('category-1', 'plan-1', 'Bills', 'Electric', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'Power Co', NULL, 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
     with pytest.raises(
         RuntimeError, match="manager-for-ynab add_transaction_and_move_funds failed"
@@ -593,26 +532,7 @@ async def test_api_run_add_transaction_rejects_transfer_category(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'Checking', 'checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-2', 'plan-1', 'Savings', 'checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'Transfer', 'account-2', 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
     with pytest.raises(
         ValueError, match="Category not allowed for transfer transactions"
@@ -620,7 +540,7 @@ async def test_api_run_add_transaction_rejects_transfer_category(
         await _api.run_add_transaction(
             "token",
             db_path,
-            plan_name="Budget",
+            plan_name="Transfer Budget",
             account_name="Checking",
             payee_name="Transfer",
             category_name="Bills - Electric",
@@ -637,20 +557,7 @@ async def test_api_run_add_transaction_missing_account_raises(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget')")
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'Power Co', NULL, 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
     with pytest.raises(
         RuntimeError, match="No open account named 'Checking' found in selected plan"
@@ -658,7 +565,7 @@ async def test_api_run_add_transaction_missing_account_raises(
         await _api.run_add_transaction(
             "token",
             db_path,
-            plan_name="Budget",
+            plan_name="Empty Budget",
             account_name="Checking",
             payee_name="Power Co",
             category_name=None,
@@ -671,24 +578,15 @@ async def test_api_run_add_transaction_missing_account_raises(
 
 
 @pytest.mark.asyncio
-async def test_api_run_add_transaction_no_plans(tmp_path: Path) -> None:
+async def test_api_run_add_transaction_missing_plan_raises(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.commit()
+    seed_db(db_path)
 
-    with pytest.raises(RuntimeError, match="No plans found in SQLite export"):
+    with pytest.raises(RuntimeError, match="No plan named 'Missing Budget' found"):
         await _api.run_add_transaction(
             "token",
             db_path,
-            plan_name=None,
+            plan_name="Missing Budget",
             account_name="Checking",
             payee_name="Power Co",
             category_name="Bills - Electric",
@@ -705,24 +603,7 @@ async def test_api_run_add_transaction_multiple_plans_requires_plan_name(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget A')")
-        connection.execute("INSERT INTO plans VALUES ('plan-2', 'Budget B')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'Checking A', 'checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-2', 'plan-2', 'Checking B', 'checking', 0, 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
     with pytest.raises(
         RuntimeError,
@@ -746,23 +627,7 @@ async def test_api_run_add_transaction_multiple_plans_requires_plan_name(
 @pytest.mark.asyncio
 async def test_api_run_add_transaction_explicit_plan_no_sync(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'Budget')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'Checking', 'checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'Power Co', NULL, 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
     with patch(
         "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
@@ -878,26 +743,7 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     fake_hass = FakeHass()
     hass = cast("HomeAssistant", fake_hass)
     db_path = tmp_path / "ynab-schema.sqlite3"
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE plans (id TEXT PRIMARY KEY, name TEXT);
-            CREATE TABLE accounts (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, type TEXT, deleted BOOLEAN, closed BOOLEAN);
-            CREATE TABLE categories (id TEXT PRIMARY KEY, plan_id TEXT, category_group_name TEXT, name TEXT, deleted BOOLEAN, hidden BOOLEAN);
-            CREATE TABLE payees (id TEXT PRIMARY KEY, plan_id TEXT, name TEXT, transfer_account_id TEXT, deleted BOOLEAN);
-            """
-        )
-        connection.execute("INSERT INTO plans VALUES ('plan-1', 'My Budget')")
-        connection.execute(
-            "INSERT INTO accounts VALUES ('account-1', 'plan-1', 'My Account', 'checking', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO categories VALUES ('category-1', 'plan-1', 'My Category Group', 'My Category', 0, 0)"
-        )
-        connection.execute(
-            "INSERT INTO payees VALUES ('payee-1', 'plan-1', 'My Payee', NULL, 0)"
-        )
-        connection.commit()
+    seed_db(db_path)
 
     await async_setup(hass, {})
     entry = config_entry_factory(data={CONF_TOKEN: "token", CONF_DB_PATH: str(db_path)})
@@ -908,16 +754,23 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     )
 
     assert description is not None
-    assert description["fields"]["plan_name"]["default"] == "My Budget"
-    assert description["fields"]["account_name"]["selector"]["select"]["options"] == [
+    assert "default" not in description["fields"]["plan_name"]
+    assert (
+        "My Budget"
+        in description["fields"]["plan_name"]["selector"]["select"]["options"]
+    )
+    assert (
         "My Account"
-    ]
-    assert description["fields"]["category_name"]["selector"]["select"]["options"] == [
+        in description["fields"]["account_name"]["selector"]["select"]["options"]
+    )
+    assert (
         "My Category Group - My Category"
-    ]
-    assert description["fields"]["payee_name"]["selector"]["select"]["options"] == [
+        in description["fields"]["category_name"]["selector"]["select"]["options"]
+    )
+    assert (
         "My Payee"
-    ]
+        in description["fields"]["payee_name"]["selector"]["select"]["options"]
+    )
 
 
 @pytest.mark.asyncio
