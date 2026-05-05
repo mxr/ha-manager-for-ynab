@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+from typing import Any
 
 import aiosqlite
-from manager_for_ynab.auto_approve import AutoApproveResult, auto_approve
-from manager_for_ynab.pending_income import PendingIncomeResult, pending_income
+from manager_for_ynab.auto_approve import AutoApproveResult
+from manager_for_ynab.auto_approve import auto_approve
+from manager_for_ynab.pending_income import PendingIncomeResult
+from manager_for_ynab.pending_income import pending_income
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
 
 if TYPE_CHECKING:

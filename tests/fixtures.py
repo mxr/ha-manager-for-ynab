@@ -4,7 +4,8 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import pytest
-from homeassistant.config_entries import SOURCE_USER, ConfigEntry
+from homeassistant.config_entries import SOURCE_USER
+from homeassistant.config_entries import ConfigEntry
 
 from custom_components.ha_manager_for_ynab.const import DOMAIN
 
