@@ -25,7 +25,12 @@ extend-select = [
   "C4",  # see flake8-comprehension
   "SIM",  # see flake8-simplify
   "TC",  # see flake8-type-checking
+  "I",  # sort imports (not using reorder-python-imports due to https://github.com/asottile/reorder-python-imports/issues/366)
 ]
+
+# not using reorder-python-imports due to https://github.com/asottile/reorder-python-imports/issues/366
+[tool.ruff.lint.isort]
+force-single-line = true
 
 [tool.tox]
 env_list = ["py314", "pre-commit"]
