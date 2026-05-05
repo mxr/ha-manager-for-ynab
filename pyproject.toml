@@ -32,6 +32,38 @@ extend-select = [
 [tool.ruff.lint.isort]
 force-single-line = true
 
+[tool.sqlfluff.layout.type.comma]
+line_position = "leading"
+spacing_before = "touch"
+
+[tool.sqlfluff.layout.type.from_clause]
+keyword_line_position = "leading"
+
+[tool.sqlfluff.layout.type.when_clause]
+keyword_line_position = "leading"
+
+[tool.sqlfluff.rules.capitalisation.functions]
+extended_capitalisation_policy = 'upper'
+
+[tool.sqlfluff.rules.capitalisation.identifiers]
+extended_capitalisation_policy = 'lower'
+
+[tool.sqlfluff.rules.capitalisation.keywords]
+capitalisation_policy = 'upper'
+
+[tool.sqlfluff.rules.capitalisation.literals]
+capitalisation_policy = 'upper'
+
+[tool.sqlfluff.rules.convention.not_equal]
+preferred_not_equal_style = "c_style"
+
+[tool.sqlfluff.rules.convention.terminator]
+multiline_newline = true
+require_final_semicolon = true
+
+[tool.sqlfluff.rules.references.quoting]
+prefer_quoted_keywords = true
+
 [tool.tox]
 env_list = ["py314", "pre-commit"]
 
