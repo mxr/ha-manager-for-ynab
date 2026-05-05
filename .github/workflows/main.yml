@@ -5,6 +5,8 @@ on:
   push:
     branches: [main]
 
+permissions: {}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -13,6 +15,8 @@ jobs:
       mypy_linting_files: ${{ steps.filter.outputs.mypy_linting_files }}
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
     - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
       id: filter
       with:
@@ -28,12 +32,23 @@ jobs:
             - '**/setup.cfg'
             - custom_components/*/manifest.json
             - tox.ini
+  zizmor:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd   # v6.0.2
+      with:
+        persist-credentials: false
+    - uses: zizmorcore/zizmor-action@b1d7e1fb5de872772f31590499237e7cce841e8e   # v0.5.3
   pre-commit-mypy-real:
     needs: [changes]
     if: needs.changes.outputs.mypy_linting_files == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
     - id: python-version
       run: |
         version="$(sed -nE 's/^  python: python(.*)$/\1/p' .pre-commit-config.yaml)"
@@ -50,11 +65,14 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-    - run: |
-        if [ "${{ needs.changes.outputs.mypy_linting_files }}" != "true" ]; then
+    - env:
+        MYPY_LINTING_FILES: ${{ needs.changes.outputs.mypy_linting_files }}
+        PRE_COMMIT_MYPY_REAL_RESULT: ${{ needs.pre-commit-mypy-real.result }}
+      run: |
+        if [ "$MYPY_LINTING_FILES" != "true" ]; then
           exit 0
         fi
-        if [ "${{ needs.pre-commit-mypy-real.result }}" != "success" ]; then
+        if [ "$PRE_COMMIT_MYPY_REAL_RESULT" != "success" ]; then
           exit 1
         fi
   main-real:
@@ -68,11 +86,14 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-    - run: |
-        if [ "${{ needs.changes.outputs.project_files }}" != "true" ]; then
+    - env:
+        PROJECT_FILES: ${{ needs.changes.outputs.project_files }}
+        MAIN_REAL_RESULT: ${{ needs.main-real.result }}
+      run: |
+        if [ "$PROJECT_FILES" != "true" ]; then
           exit 0
         fi
-        if [ "${{ needs.main-real.result }}" != "success" ]; then
+        if [ "$MAIN_REAL_RESULT" != "success" ]; then
           exit 1
         fi
   main-win-real:
@@ -87,10 +108,13 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-    - run: |
-        if [ "${{ needs.changes.outputs.project_files }}" != "true" ]; then
+    - env:
+        PROJECT_FILES: ${{ needs.changes.outputs.project_files }}
+        MAIN_WIN_REAL_RESULT: ${{ needs.main-win-real.result }}
+      run: |
+        if [ "$PROJECT_FILES" != "true" ]; then
           exit 0
         fi
-        if [ "${{ needs.main-win-real.result }}" != "success" ]; then
+        if [ "$MAIN_WIN_REAL_RESULT" != "success" ]; then
           exit 1
         fi

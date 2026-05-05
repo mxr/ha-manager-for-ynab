@@ -36,4 +36,4 @@ repos:
   rev: v1.20.2
   hooks:
   - id: mypy
-    additional_dependencies: [aiosqlite>=0.21.0, homeassistant-stubs, manager-for-ynab>=1.6.2, sqlite-export-for-ynab>=2.6.0]
+    additional_dependencies: [aiosqlite>=0.21.0, homeassistant-stubs, manager-for-ynab>=1.6.3, sqlite-export-for-ynab>=2.7.0]
