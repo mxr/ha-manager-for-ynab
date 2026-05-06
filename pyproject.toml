@@ -1,3 +1,6 @@
+[tool.coverage.run]
+plugins = ["covdefaults"]
+
 [tool.mypy]
 check_untyped_defs = true
 disallow_any_generics = true
