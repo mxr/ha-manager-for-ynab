@@ -158,11 +158,13 @@ class FakeServiceCall:
     data: dict[str, object]
 
 
-def test_runtime_data_listener_unsubscribe_path() -> None:
+def test_runtime_data_listener_unsubscribe_is_idempotent() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     listener = Mock()
 
     unsubscribe = runtime_data.async_add_listener(listener)
+    unsubscribe()
+    # Calling unsubscribe again should be a no-op once the listener is gone.
     unsubscribe()
     runtime_data.async_set_pending_income_updated_count(7)
 
@@ -718,29 +720,31 @@ async def test_api_run_add_transaction_without_plans_raises(tmp_path: Path) -> N
         )
 
 
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    new_callable=AsyncMock,
+    return_value=0,
+)
 @pytest.mark.asyncio
-async def test_api_run_add_transaction_explicit_plan_no_sync(tmp_path: Path) -> None:
+async def test_api_run_add_transaction_explicit_plan_no_sync(
+    add_transaction_and_move_funds: AsyncMock, tmp_path: Path
+) -> None:
     db_path = tmp_path / "db.sqlite3"
     seed_db(db_path)
 
-    with patch(
-        "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
-        new_callable=AsyncMock,
-        return_value=0,
-    ) as add_transaction_and_move_funds:
-        await _api.run_add_transaction(
-            "token",
-            db_path,
-            plan_name="Budget",
-            account_name="Checking",
-            payee_name="Power Co",
-            category_name=None,
-            date=datetime.date(2026, 5, 1),
-            cleared="cleared",
-            amount=Decimal("12.34"),
-            sync=False,
-            quiet=False,
-        )
+    await _api.run_add_transaction(
+        "token",
+        db_path,
+        plan_name="Budget",
+        account_name="Checking",
+        payee_name="Power Co",
+        category_name=None,
+        date=datetime.date(2026, 5, 1),
+        cleared="cleared",
+        amount=Decimal("12.34"),
+        sync=False,
+        quiet=False,
+    )
 
     add_transaction_and_move_funds.assert_awaited_once()
     resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
@@ -1066,6 +1070,74 @@ async def test_register_services_success_and_idempotence(
     )
     assert get_add_transaction_options.await_count == 5
     get_add_transaction_options.assert_has_awaits([call(Path("/tmp/db.sqlite3"))] * 5)
+
+
+@pytest.mark.asyncio
+async def test_fake_hass_block_till_done_without_tasks() -> None:
+    await FakeHass().async_block_till_done()
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_add_transaction", return_value=None
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_pending_income",
+    return_value=PendingIncomeResult(transactions=[], updated_count=4),
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_auto_approve",
+    return_value=AutoApproveResult(transactions=[], updated_count=0),
+)
+@pytest.mark.asyncio
+async def test_register_services_sync_false_skips_schema_refresh(
+    run_auto_approve: Mock, run_pending_income: Mock, run_add_transaction: Mock
+) -> None:
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
+    fake_hass.data[DOMAIN] = {
+        "entry-1": RuntimeData(token="token", db_path="/tmp/db.sqlite3")
+    }
+
+    await _async_register_services(hass)
+
+    pending = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
+    )
+    auto_approve = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
+    )
+    add_transaction = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
+    )
+
+    await auto_approve(
+        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
+    )
+    await pending(
+        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
+    )
+    await add_transaction(
+        FakeServiceCall(
+            data={
+                "account_name": "Checking",
+                "payee_name": "Store",
+                "date": datetime.date(2026, 5, 1),
+                "cleared": "uncleared",
+                "amount": Decimal("12.34"),
+                "sync": False,
+                "quiet": True,
+            }
+        )
+    )
+
+    assert fake_hass.tasks == []
+    assert fake_hass.data[DOMAIN]["entry-1"].pending_income_updated_count == 4
+    run_auto_approve.assert_called_once()
+    run_pending_income.assert_called_once()
+    run_add_transaction.assert_called_once()
 
 
 @patch(
