@@ -123,8 +123,9 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
             SELECT p.name AS plan_name, c.category_group_name || ' - ' || c.name AS name
             FROM categories AS c
             INNER JOIN plans AS p ON p.id = c.plan_id
-            WHERE NOT c.deleted AND NOT c.hidden
-            ORDER BY LOWER(c.category_group_name), LOWER(c.name)
+            WHERE NOT c.deleted AND NOT c.hidden AND c.name != 'Uncategorized'
+            GROUP BY p.name, c.category_group_name, c.name
+            ORDER BY LOWER(p.name), CASE WHEN c.category_group_name = 'Credit Card Payments' THEN 1 ELSE 0 END, LOWER(c.category_group_name), LOWER(c.name)
             """,
         )
         accounts = await _fetch_grouped_column(
@@ -134,7 +135,8 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
             FROM accounts AS a
             INNER JOIN plans AS p ON p.id = a.plan_id
             WHERE NOT a.deleted AND NOT a.closed
-            ORDER BY LOWER(a.name)
+            GROUP BY p.name, a.name
+            ORDER BY LOWER(p.name), LOWER(a.name)
             """,
         )
         payees = await _fetch_grouped_column(
@@ -144,6 +146,37 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
             FROM payees
             INNER JOIN plans AS p ON p.id = payees.plan_id
             WHERE NOT payees.deleted
+            GROUP BY p.name, payees.name
+            ORDER BY LOWER(p.name), LOWER(payees.name)
+            """,
+        )
+        category_options = await _fetch_column(
+            con,
+            """
+            SELECT c.category_group_name || ' - ' || c.name AS name
+            FROM categories AS c
+            WHERE NOT c.deleted AND NOT c.hidden AND c.name != 'Uncategorized'
+            GROUP BY c.category_group_name, c.name
+            ORDER BY CASE WHEN c.category_group_name = 'Credit Card Payments' THEN 1 ELSE 0 END, LOWER(c.category_group_name), LOWER(c.name)
+            """,
+        )
+        account_options = await _fetch_column(
+            con,
+            """
+            SELECT a.name
+            FROM accounts AS a
+            WHERE NOT a.deleted AND NOT a.closed
+            GROUP BY a.name
+            ORDER BY LOWER(a.name)
+            """,
+        )
+        payee_options = await _fetch_column(
+            con,
+            """
+            SELECT payees.name
+            FROM payees
+            WHERE NOT payees.deleted
+            GROUP BY payees.name
             ORDER BY LOWER(payees.name)
             """,
         )
@@ -151,6 +184,9 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
     return {
         "default_plan_name": plans[0] if len(plans) == 1 else None,
         "plans": plans,
+        "categories": category_options,
+        "accounts": account_options,
+        "payees": payee_options,
         "categories_by_plan": categories,
         "accounts_by_plan": accounts,
         "payees_by_plan": payees,

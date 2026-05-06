@@ -56,6 +56,12 @@ from custom_components.ha_manager_for_ynab.sensor import (
 from tests.fixtures import config_entry_factory as config_entry_factory
 
 ADD_TRANSACTION_SEED = Path(__file__).parent / "sql" / "add_transaction" / "seed.sql"
+ADD_TRANSACTION_NO_PLANS_SEED = (
+    Path(__file__).parent / "sql" / "add_transaction" / "no_plans.sql"
+)
+ADD_TRANSACTION_SINGLE_PLAN_SEED = (
+    Path(__file__).parent / "sql" / "add_transaction" / "single_plan.sql"
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -69,9 +75,9 @@ if TYPE_CHECKING:
     ServiceHandler = Callable[[object], Coroutine[Any, Any, object | None]]
 
 
-def seed_db(db_path: Path) -> None:
+def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
     with sqlite3.connect(db_path) as con:
-        con.executescript(ADD_TRANSACTION_SEED.read_text())
+        con.executescript(seed_path.read_text())
         con.commit()
 
 
@@ -451,6 +457,21 @@ async def test_api_get_add_transaction_options_multiple_plans(tmp_path: Path) ->
     assert options["cleared"] == CLEARED_OPTIONS
 
 
+@pytest.mark.asyncio
+async def test_api_get_add_transaction_options_flat_lists_are_unique_and_sorted(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    options = await _api.get_add_transaction_options(db_path)
+
+    assert options["accounts"].count("Checking B") == 1
+    assert options["payees"].count("Market Co") == 1
+    assert options["categories"].count("Food - Groceries") == 1
+    assert options["categories"][-1] == "Credit Card Payments - Visa"
+
+
 @patch(
     "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
     new_callable=AsyncMock,
@@ -634,6 +655,59 @@ async def test_api_run_add_transaction_multiple_plans_requires_plan_name(
             db_path,
             plan_name=None,
             account_name="Checking A",
+            payee_name="Power Co",
+            category_name=None,
+            date=datetime.date(2026, 5, 1),
+            cleared="uncleared",
+            amount=Decimal("12.34"),
+            sync=False,
+            quiet=False,
+        )
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    new_callable=AsyncMock,
+    return_value=0,
+)
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
+    add_transaction_and_move_funds: AsyncMock,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path, ADD_TRANSACTION_SINGLE_PLAN_SEED)
+
+    await _api.run_add_transaction(
+        "token",
+        db_path,
+        plan_name=None,
+        account_name="Checking",
+        payee_name="Power Co",
+        category_name=None,
+        date=datetime.date(2026, 5, 1),
+        cleared="uncleared",
+        amount=Decimal("12.34"),
+        sync=False,
+        quiet=False,
+    )
+
+    add_transaction_and_move_funds.assert_awaited_once()
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert resolved.plan.name == "Single Budget"
+
+
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_without_plans_raises(tmp_path: Path) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path, ADD_TRANSACTION_NO_PLANS_SEED)
+
+    with pytest.raises(RuntimeError, match="No plans found in SQLite export"):
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name=None,
+            account_name="Checking",
             payee_name="Power Co",
             category_name=None,
             date=datetime.date(2026, 5, 1),

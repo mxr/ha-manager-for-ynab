@@ -101,4 +101,25 @@ INSERT INTO categories VALUES (
     'schema-category', 'schema-plan', 'My Category Group', 'My Category', 0, 0
 )
 ;
+INSERT INTO accounts VALUES (
+    'schema-duplicate-account', 'schema-plan', 'Checking B', 'checking', 0, 0
+)
+;
+INSERT INTO categories VALUES (
+    'schema-duplicate-category', 'schema-plan', 'Food', 'Groceries', 0, 0
+)
+;
+INSERT INTO categories VALUES (
+    'schema-credit-card-category'
+    , 'schema-plan'
+    , 'Credit Card Payments'
+    , 'Visa'
+    , 0
+    , 0
+)
+;
 INSERT INTO payees VALUES ('schema-payee', 'schema-plan', 'My Payee', NULL, 0);
+INSERT INTO payees VALUES (
+    'schema-duplicate-payee', 'schema-plan', 'Market Co', NULL, 0
+)
+;
