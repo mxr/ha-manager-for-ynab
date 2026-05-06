@@ -13,6 +13,7 @@ import voluptuous as vol
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
+from homeassistant.core import ServiceResponse
 from homeassistant.core import SupportsResponse
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -205,7 +206,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("sqlite_export failed")
             raise HomeAssistantError(f"sqlite_export failed: {err}") from err
 
-    async def async_handle_sqlite_query(call: ServiceCall) -> dict[str, object]:
+    async def async_handle_sqlite_query(call: ServiceCall) -> ServiceResponse:
         runtime_data = _get_runtime_data(hass)
         try:
             if call.data["sync"]:
