@@ -8,11 +8,13 @@ from dataclasses import field
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import cast
 
 import voluptuous as vol
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
+from homeassistant.core import ServiceResponse
 from homeassistant.core import SupportsResponse
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -205,7 +207,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("sqlite_export failed")
             raise HomeAssistantError(f"sqlite_export failed: {err}") from err
 
-    async def async_handle_sqlite_query(call: ServiceCall) -> dict[str, object]:
+    async def async_handle_sqlite_query(call: ServiceCall) -> ServiceResponse:
         runtime_data = _get_runtime_data(hass)
         try:
             if call.data["sync"]:
@@ -224,7 +226,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("sqlite_query failed")
             raise HomeAssistantError(f"sqlite_query failed: {err}") from err
 
-        return result
+        return cast("ServiceResponse", result)
 
     async def async_handle_add_transaction(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
@@ -319,9 +321,9 @@ def _set_add_transaction_service_schema(
 ) -> None:
     """Set dynamic service metadata for add_transaction."""
     plans = _as_string_list(options.get("plans"))
-    accounts = _unique_sorted_options(options.get("accounts_by_plan"))
-    categories = _unique_sorted_options(options.get("categories_by_plan"))
-    payees = _unique_sorted_options(options.get("payees_by_plan"))
+    accounts = _as_string_list(options.get("accounts"))
+    categories = _as_string_list(options.get("categories"))
+    payees = _as_string_list(options.get("payees"))
     default_plan_name = options.get("default_plan_name")
 
     plan_field: dict[str, object] = {
@@ -424,17 +426,6 @@ def _as_string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, str)]
-
-
-def _unique_sorted_options(value: object) -> list[str]:
-    if not isinstance(value, dict):
-        return []
-
-    options: set[str] = set()
-    for values in value.values():
-        if isinstance(values, list):
-            options.update(item for item in values if isinstance(item, str))
-    return sorted(options, key=str.lower)
 
 
 @callback
