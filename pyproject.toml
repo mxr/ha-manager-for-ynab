@@ -34,6 +34,7 @@ extend-select = [
 # not using reorder-python-imports due to https://github.com/asottile/reorder-python-imports/issues/366
 [tool.ruff.lint.isort]
 force-single-line = true
+required-imports = ["from __future__ import annotations"]
 
 [tool.sqlfluff.layout.type.comma]
 line_position = "leading"
