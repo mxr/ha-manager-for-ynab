@@ -8,7 +8,6 @@ from dataclasses import field
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import cast
 
 import voluptuous as vol
 from homeassistant.const import Platform
@@ -226,7 +225,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("sqlite_query failed")
             raise HomeAssistantError(f"sqlite_query failed: {err}") from err
 
-        return cast("ServiceResponse", result)
+        return result
 
     async def async_handle_add_transaction(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
