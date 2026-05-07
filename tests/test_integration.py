@@ -732,12 +732,9 @@ async def test_config_flow_user_creates_entry(
     )
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_async_setup_registers_services(
-    hass: HomeAssistant, enable_custom_integrations: None
-) -> None:
-    del enable_custom_integrations
-
+async def test_async_setup_registers_services(hass: HomeAssistant) -> None:
     setup_ok = await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 
@@ -749,12 +746,9 @@ async def test_async_setup_registers_services(
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_async_setup_keeps_existing_services(
-    hass: HomeAssistant, enable_custom_integrations: None
-) -> None:
-    del enable_custom_integrations
-
+async def test_async_setup_keeps_existing_services(hass: HomeAssistant) -> None:
     assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 
@@ -767,12 +761,9 @@ async def test_async_setup_keeps_existing_services(
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_config_entry_setup_and_unload(
-    hass: HomeAssistant, enable_custom_integrations: None
-) -> None:
-    del enable_custom_integrations
-
+async def test_config_entry_setup_and_unload(hass: HomeAssistant) -> None:
     entry = await setup_integration(hass)
 
     unload_ok = await hass.config_entries.async_unload(entry.entry_id)
@@ -788,13 +779,12 @@ async def test_config_entry_setup_and_unload(
     new_callable=AsyncMock,
     return_value=False,
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_config_entry_unload_failure_keeps_entry_data(
     async_unload_platforms: AsyncMock,
     hass: HomeAssistant,
-    enable_custom_integrations: None,
 ) -> None:
-    del enable_custom_integrations
     entry = await setup_integration(hass)
 
     unload_ok = await hass.config_entries.async_unload(entry.entry_id)
@@ -809,15 +799,13 @@ async def test_config_entry_unload_failure_keeps_entry_data(
     "custom_components.ha_manager_for_ynab._current_local_date",
     return_value=datetime.date(2026, 5, 6),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_async_setup_entry_refreshes_add_transaction_schema(
     _current_local_date: Mock,
     hass: HomeAssistant,
-    enable_custom_integrations: None,
     tmp_path: Path,
 ) -> None:
-    del enable_custom_integrations
-
     db_path = tmp_path / "ynab-schema.sqlite3"
     seed_db(db_path)
 
@@ -860,12 +848,11 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     )
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_set_add_transaction_service_schema_handles_bad_options(
-    hass: HomeAssistant, enable_custom_integrations: None
+    hass: HomeAssistant,
 ) -> None:
-    del enable_custom_integrations
-
     await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 
@@ -891,12 +878,11 @@ async def test_set_add_transaction_service_schema_handles_bad_options(
     assert description["fields"]["payee_name"]["selector"]["select"]["options"] == []
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_config_entry_setup_registers_entity_and_device(
-    hass: HomeAssistant, enable_custom_integrations: None
+    hass: HomeAssistant,
 ) -> None:
-    del enable_custom_integrations
-
     entry = await setup_integration(hass)
     entity_id = "sensor.manager_for_ynab_pending_income_updated_count"
 
@@ -912,12 +898,9 @@ async def test_config_entry_setup_registers_entity_and_device(
     assert device.name == "Manager for YNAB"
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_service_raises_without_a_loaded_entry(
-    hass: HomeAssistant, enable_custom_integrations: None
-) -> None:
-    del enable_custom_integrations
-
+async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> None:
     await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
 
@@ -954,6 +937,7 @@ async def test_service_raises_without_a_loaded_entry(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
     return_value=AutoApproveResult(transactions=[], updated_count=0),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_register_services_success_and_idempotence(
     run_auto_approve: Mock,
@@ -963,10 +947,7 @@ async def test_register_services_success_and_idempotence(
     get_add_transaction_options: AsyncMock,
     run_sql_query: AsyncMock,
     hass: HomeAssistant,
-    enable_custom_integrations: None,
 ) -> None:
-    del enable_custom_integrations
-
     await setup_integration(hass)
 
     await hass.services.async_call(
@@ -1070,16 +1051,14 @@ async def test_register_services_success_and_idempotence(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
     return_value=AutoApproveResult(transactions=[], updated_count=0),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_register_services_sync_false_skips_schema_refresh(
     run_auto_approve: Mock,
     run_pending_income: Mock,
     run_add_transaction: Mock,
     hass: HomeAssistant,
-    enable_custom_integrations: None,
 ) -> None:
-    del enable_custom_integrations
-
     await setup_integration(hass)
 
     await hass.services.async_call(
@@ -1131,16 +1110,14 @@ async def test_register_services_sync_false_skips_schema_refresh(
     "custom_components.ha_manager_for_ynab._current_local_date",
     return_value=datetime.date(2026, 5, 6),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_add_transaction_service_uses_current_date_by_default(
     _current_local_date: Mock,
     run_add_transaction: Mock,
     get_add_transaction_options: AsyncMock,
     hass: HomeAssistant,
-    enable_custom_integrations: None,
 ) -> None:
-    del enable_custom_integrations
-
     await setup_integration(hass)
 
     await hass.services.async_call(
@@ -1243,6 +1220,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
         ),
     ],
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: Mock,
@@ -1254,10 +1232,7 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     data: dict[str, object],
     match: str,
     hass: HomeAssistant,
-    enable_custom_integrations: None,
 ) -> None:
-    del enable_custom_integrations
-
     del (
         run_auto_approve,
         run_pending_income,
