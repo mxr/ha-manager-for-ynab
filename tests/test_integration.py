@@ -291,7 +291,11 @@ async def test_sensor_async_setup_entry_adds_entity(
     assert isinstance(added[0], PendingIncomeUpdatedCountSensor)
 
 
-def test_service_schemas_default_values() -> None:
+@patch(
+    "custom_components.ha_manager_for_ynab._current_local_date",
+    return_value=datetime.date(2026, 5, 6),
+)
+def test_service_schemas_default_values(_current_local_date: Mock) -> None:
     assert AUTO_APPROVE_SCHEMA({}) == {"for_real": False, "sync": True, "quiet": False}
     assert PENDING_INCOME_SCHEMA({}) == {
         "for_real": False,
@@ -309,12 +313,14 @@ def test_service_schemas_default_values() -> None:
     ) == {
         "account_name": "Checking",
         "payee_name": "Store",
-        "date": datetime.date.today(),
+        "use_current_date": True,
+        "date": datetime.date(2026, 5, 6),
         "cleared": "uncleared",
         "amount": Decimal("12.34"),
         "sync": True,
         "quiet": False,
     }
+    _current_local_date.assert_called_once_with()
 
 
 @patch("custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path")
@@ -833,8 +839,13 @@ async def test_async_setup_and_unload_entry(
     assert fake_hass.data[DOMAIN] == {}
 
 
+@patch(
+    "custom_components.ha_manager_for_ynab._current_local_date",
+    return_value=datetime.date(2026, 5, 6),
+)
 @pytest.mark.asyncio
 async def test_async_setup_entry_refreshes_add_transaction_schema(
+    _current_local_date: Mock,
     config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
     tmp_path: Path,
 ) -> None:
@@ -874,7 +885,10 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
         "custom_value"
         not in description["fields"]["category_name"]["selector"]["select"]
     )
-    assert description["fields"]["date"]["default"] == datetime.date.today().isoformat()
+    assert description["fields"]["use_current_date"]["default"] is True
+    assert description["fields"]["use_current_date"]["selector"] == {"boolean": {}}
+    assert description["fields"]["date"]["default"] == "2026-05-06"
+    _current_local_date.assert_called_once_with()
     assert (
         "My Payee"
         in description["fields"]["payee_name"]["selector"]["select"]["options"]
@@ -1017,6 +1031,7 @@ async def test_register_services_success_and_idempotence(
                 "account_name": "Checking",
                 "payee_name": "Store",
                 "category_name": "Food - Groceries",
+                "use_current_date": False,
                 "date": datetime.date(2026, 5, 1),
                 "cleared": "uncleared",
                 "amount": Decimal("12.34"),
@@ -1141,6 +1156,72 @@ async def test_register_services_sync_false_skips_schema_refresh(
 
 
 @patch(
+    "custom_components.ha_manager_for_ynab._api.get_add_transaction_options",
+    new_callable=AsyncMock,
+    return_value={},
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._api.run_add_transaction", return_value=None
+)
+@patch(
+    "custom_components.ha_manager_for_ynab._current_local_date",
+    return_value=datetime.date(2026, 5, 6),
+)
+@pytest.mark.asyncio
+async def test_add_transaction_service_uses_current_date_by_default(
+    _current_local_date: Mock,
+    run_add_transaction: Mock,
+    get_add_transaction_options: AsyncMock,
+    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+) -> None:
+    fake_hass = FakeHass()
+    hass = cast("HomeAssistant", fake_hass)
+    await async_setup(hass, {})
+    entry = config_entry_factory(
+        data={CONF_TOKEN: "token", CONF_DB_PATH: "/tmp/db.sqlite3"}
+    )
+    await async_setup_entry(hass, entry)
+    add_transaction = cast(
+        "ServiceHandler",
+        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
+    )
+
+    await add_transaction(
+        FakeServiceCall(
+            data={
+                "plan_name": "Budget",
+                "account_name": "Checking",
+                "payee_name": "Store",
+                "category_name": "Food - Groceries",
+                "use_current_date": True,
+                "date": datetime.date(2026, 5, 1),
+                "cleared": "uncleared",
+                "amount": Decimal("12.34"),
+                "sync": False,
+                "quiet": True,
+            }
+        )
+    )
+
+    run_add_transaction.assert_called_once_with(
+        "token",
+        Path("/tmp/db.sqlite3"),
+        plan_name="Budget",
+        account_name="Checking",
+        payee_name="Store",
+        category_name="Food - Groceries",
+        date=datetime.date(2026, 5, 6),
+        cleared="uncleared",
+        amount=Decimal("12.34"),
+        sync=False,
+        quiet=True,
+    )
+    assert _current_local_date.call_count == 2
+    _current_local_date.assert_has_calls([call(), call()])
+    get_add_transaction_options.assert_awaited_once_with(Path("/tmp/db.sqlite3"))
+
+
+@patch(
     "custom_components.ha_manager_for_ynab._api.run_sql_query",
     new_callable=AsyncMock,
     side_effect=RuntimeError("boom"),
@@ -1193,6 +1274,7 @@ async def test_register_services_sync_false_skips_schema_refresh(
             {
                 "account_name": "Checking",
                 "payee_name": "Store",
+                "use_current_date": False,
                 "date": datetime.date(2026, 5, 1),
                 "cleared": "uncleared",
                 "amount": Decimal("12.34"),

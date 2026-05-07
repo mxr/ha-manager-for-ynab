@@ -19,6 +19,7 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import service as service_helper
+from homeassistant.util import dt as dt_util
 
 from . import _api
 from .const import ATTR_ACCOUNT_NAME
@@ -29,6 +30,7 @@ from .const import ATTR_DATE
 from .const import ATTR_PAYEE_NAME
 from .const import ATTR_PLAN_NAME
 from .const import ATTR_SQL
+from .const import ATTR_USE_CURRENT_DATE
 from .const import CLEARED_DEFAULT
 from .const import CLEARED_OPTIONS
 from .const import CONF_DB_PATH
@@ -48,6 +50,12 @@ if TYPE_CHECKING:
     from homeassistant.helpers.typing import ConfigType
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+
+def _current_local_date() -> datetime.date:
+    """Return the current date in Home Assistant's local timezone."""
+    return dt_util.now().date()
+
 
 PENDING_INCOME_SCHEMA = vol.Schema(
     {
@@ -81,8 +89,9 @@ ADD_TRANSACTION_SCHEMA = vol.Schema(
         vol.Required(ATTR_ACCOUNT_NAME): cv.string,
         vol.Required(ATTR_PAYEE_NAME): cv.string,
         vol.Optional(ATTR_CATEGORY_NAME): cv.string,
+        vol.Required(ATTR_USE_CURRENT_DATE, default=True): cv.boolean,
         vol.Required(
-            ATTR_DATE, default=lambda: datetime.date.today().isoformat()
+            ATTR_DATE, default=lambda: _current_local_date().isoformat()
         ): vol.Coerce(datetime.date.fromisoformat),
         vol.Required(ATTR_CLEARED, default=CLEARED_DEFAULT): vol.In(CLEARED_OPTIONS),
         vol.Required(ATTR_AMOUNT): vol.Coerce(lambda value: Decimal(str(value))),
@@ -237,7 +246,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 account_name=call.data[ATTR_ACCOUNT_NAME],
                 payee_name=call.data[ATTR_PAYEE_NAME],
                 category_name=call.data.get(ATTR_CATEGORY_NAME),
-                date=call.data[ATTR_DATE],
+                date=_current_local_date()
+                if call.data.get(ATTR_USE_CURRENT_DATE, True)
+                else call.data[ATTR_DATE],
                 cleared=call.data[ATTR_CLEARED],
                 amount=call.data[ATTR_AMOUNT],
                 sync=call.data["sync"],
@@ -377,11 +388,18 @@ def _set_add_transaction_service_schema(
                         }
                     },
                 },
+                ATTR_USE_CURRENT_DATE: {
+                    "name": "Use current date",
+                    "description": "Use the current date in Home Assistant's local timezone. When enabled, Date is ignored.",
+                    "required": True,
+                    "default": True,
+                    "selector": {"boolean": {}},
+                },
                 ATTR_DATE: {
                     "name": "Date",
-                    "description": "Transaction date.",
+                    "description": "Date picker value to use only when Use current date is off.",
                     "required": True,
-                    "default": datetime.date.today().isoformat(),
+                    "default": _current_local_date().isoformat(),
                     "selector": {"date": {}},
                 },
                 ATTR_CLEARED: {

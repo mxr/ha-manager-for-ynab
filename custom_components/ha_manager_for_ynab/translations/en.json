@@ -42,7 +42,7 @@
           "name": "Cleared"
         },
         "date": {
-          "description": "Transaction date.",
+          "description": "Date picker value to use only when Use current date is off.",
           "name": "Date"
         },
         "payee_name": {
@@ -60,6 +60,10 @@
         "sync": {
           "description": "Sync the SQLite export before creating the transaction.",
           "name": "Sync"
+        },
+        "use_current_date": {
+          "description": "Use the current date in Home Assistant's local timezone. When enabled, Date is ignored.",
+          "name": "Use current date"
         }
       },
       "name": "Add transaction"
