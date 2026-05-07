@@ -47,4 +47,5 @@ repos:
     - asyncio-for-ynab>=1.83.0
     - homeassistant-stubs
     - manager-for-ynab>=1.6.4
+    - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab>=2.7.1

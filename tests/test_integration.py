@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import datetime
 import sqlite3
-from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import Any
 from typing import cast
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
@@ -18,12 +15,16 @@ from unittest.mock import patch
 import aiosqlite
 import pytest
 import voluptuous as vol
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import State
-from homeassistant.core import SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_get_cached_service_description
+from homeassistant.setup import async_setup_component
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.pending_income import PendingIncomeResult
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ha_manager_for_ynab import ADD_TRANSACTION_SCHEMA
 from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
@@ -33,11 +34,7 @@ from custom_components.ha_manager_for_ynab import SQLITE_QUERY_SCHEMA
 from custom_components.ha_manager_for_ynab import RuntimeData
 from custom_components.ha_manager_for_ynab import _api
 from custom_components.ha_manager_for_ynab import _async_register_services
-from custom_components.ha_manager_for_ynab import _get_runtime_data
 from custom_components.ha_manager_for_ynab import _set_add_transaction_service_schema
-from custom_components.ha_manager_for_ynab import async_setup
-from custom_components.ha_manager_for_ynab import async_setup_entry
-from custom_components.ha_manager_for_ynab import async_unload_entry
 from custom_components.ha_manager_for_ynab.config_flow import ManagerForYnabConfigFlow
 from custom_components.ha_manager_for_ynab.config_flow import _user_schema
 from custom_components.ha_manager_for_ynab.const import CLEARED_OPTIONS
@@ -53,7 +50,6 @@ from custom_components.ha_manager_for_ynab.sensor import PendingIncomeUpdatedCou
 from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
 )
-from tests.fixtures import config_entry_factory as config_entry_factory
 
 ADD_TRANSACTION_SEED = Path(__file__).parent / "sql" / "add_transaction" / "seed.sql"
 ADD_TRANSACTION_NO_PLANS_SEED = (
@@ -64,15 +60,9 @@ ADD_TRANSACTION_SINGLE_PLAN_SEED = (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from collections.abc import Coroutine
-
-    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-
-    ServiceHandler = Callable[[object], Coroutine[Any, Any, object | None]]
 
 
 def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
@@ -81,81 +71,24 @@ def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
         con.commit()
 
 
-class FakeServices:
-    def __init__(self) -> None:
-        self.registered: dict[
-            tuple[str, str], dict[str, ServiceHandler | object | None]
-        ] = {}
+async def setup_integration(
+    hass: HomeAssistant,
+    *,
+    entry_id: str = "entry-1",
+    db_path: str = "/tmp/db.sqlite3",
+) -> MockConfigEntry:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_TOKEN: "token", CONF_DB_PATH: db_path},
+        entry_id=entry_id,
+        title="Manager for YNAB",
+        unique_id=DOMAIN,
+    )
+    entry.add_to_hass(hass)
 
-    def has_service(self, domain: str, service: str) -> bool:
-        return (domain, service) in self.registered
-
-    def supports_response(self, domain: str, service: str) -> SupportsResponse:
-        registered = self.registered.get((domain, service))
-        if registered is None:
-            return SupportsResponse.NONE
-        supports_response = registered["supports_response"]
-        return (
-            SupportsResponse.NONE
-            if supports_response is None
-            else cast("SupportsResponse", supports_response)
-        )
-
-    def async_register(
-        self,
-        domain: str,
-        service: str,
-        handler: ServiceHandler,
-        schema: object = None,
-        supports_response: object = None,
-    ) -> None:
-        self.registered[(domain, service)] = {
-            "handler": handler,
-            "schema": schema,
-            "supports_response": supports_response,
-        }
-
-
-class FakeConfigEntries:
-    def __init__(self) -> None:
-        self.forward_calls: list[tuple[ConfigEntry[RuntimeData], object]] = []
-        self.unload_result = True
-
-    async def async_forward_entry_setups(
-        self, entry: ConfigEntry[RuntimeData], platforms: object
-    ) -> None:
-        self.forward_calls.append((entry, platforms))
-
-    async def async_unload_platforms(
-        self, entry: ConfigEntry[RuntimeData], platforms: object
-    ) -> bool:
-        self.forward_calls.append((entry, platforms))
-        return self.unload_result
-
-
-class FakeHass:
-    def __init__(self) -> None:
-        self.data: dict[str, dict[str, RuntimeData]] = {}
-        self.services = FakeServices()
-        self.config_entries = FakeConfigEntries()
-        self.tasks: list[asyncio.Task[object]] = []
-
-    def async_create_task(
-        self, target: Coroutine[Any, Any, object], name: str | None = None
-    ) -> asyncio.Task[object]:
-        del name
-        task = asyncio.create_task(target)
-        self.tasks.append(task)
-        return task
-
-    async def async_block_till_done(self) -> None:
-        if self.tasks:
-            await asyncio.gather(*self.tasks)
-
-
-@dataclass
-class FakeServiceCall:
-    data: dict[str, object]
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
 
 
 def test_runtime_data_listener_unsubscribe_is_idempotent() -> None:
@@ -183,13 +116,6 @@ def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
 
     assert runtime_data.pending_income_updated_count == 3
     assert seen == [3]
-
-
-def test_fake_services_supports_response_defaults_to_none() -> None:
-    assert (
-        FakeServices().supports_response(DOMAIN, SERVICE_ADD_TRANSACTION)
-        == SupportsResponse.NONE
-    )
 
 
 def test_pending_income_sensor_reads_runtime_state() -> None:
@@ -266,11 +192,10 @@ async def test_sensor_async_added_to_hass_preserves_runtime_state(
 
 
 @pytest.mark.asyncio
-async def test_sensor_async_setup_entry_adds_entity(
-    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
-) -> None:
+async def test_sensor_async_setup_entry_adds_entity() -> None:
     added: list[Entity] = []
-    entry = config_entry_factory(runtime_data=RuntimeData(token="token", db_path=""))
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="entry-1")
+    entry.runtime_data = RuntimeData(token="token", db_path="")
 
     def add_entities(
         new_entities: list[Entity],
@@ -807,12 +732,11 @@ async def test_config_flow_user_creates_entry(
     )
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_async_setup_registers_services() -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-
-    setup_ok = await async_setup(hass, {})
+async def test_async_setup_registers_services(hass: HomeAssistant) -> None:
+    setup_ok = await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
 
     assert setup_ok is True
     assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
@@ -822,42 +746,70 @@ async def test_async_setup_registers_services() -> None:
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_async_setup_and_unload_entry(
-    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
-) -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    entry = config_entry_factory(data={CONF_TOKEN: "token", CONF_DB_PATH: ""})
+async def test_async_setup_keeps_existing_services(hass: HomeAssistant) -> None:
+    assert await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
 
-    await async_setup(hass, {})
-    await async_setup_entry(hass, entry)
-    unload_ok = await async_unload_entry(hass, entry)
+    await _async_register_services(hass)
+
+    assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
+    assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION)
+    assert hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME)
+    assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
+    assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
+@pytest.mark.asyncio
+async def test_config_entry_setup_and_unload(hass: HomeAssistant) -> None:
+    entry = await setup_integration(hass)
+
+    unload_ok = await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
 
     assert unload_ok is True
-    assert entry.runtime_data.token == "token"
-    assert fake_hass.data[DOMAIN] == {}
+    assert entry.state is ConfigEntryState.NOT_LOADED
+    assert hass.data[DOMAIN] == {}
+
+
+@patch(
+    "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
+    new_callable=AsyncMock,
+    return_value=False,
+)
+@pytest.mark.usefixtures("enable_custom_integrations")
+@pytest.mark.asyncio
+async def test_config_entry_unload_failure_keeps_entry_data(
+    async_unload_platforms: AsyncMock,
+    hass: HomeAssistant,
+) -> None:
+    entry = await setup_integration(hass)
+
+    unload_ok = await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert unload_ok is False
+    assert entry.entry_id in hass.data[DOMAIN]
+    async_unload_platforms.assert_awaited_once()
 
 
 @patch(
     "custom_components.ha_manager_for_ynab._current_local_date",
     return_value=datetime.date(2026, 5, 6),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_async_setup_entry_refreshes_add_transaction_schema(
     _current_local_date: Mock,
-    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+    hass: HomeAssistant,
     tmp_path: Path,
 ) -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
     db_path = tmp_path / "ynab-schema.sqlite3"
     seed_db(db_path)
 
-    await async_setup(hass, {})
-    entry = config_entry_factory(data={CONF_TOKEN: "token", CONF_DB_PATH: str(db_path)})
-
-    await async_setup_entry(hass, entry)
+    entry = await setup_integration(hass, db_path=str(db_path))
     description = async_get_cached_service_description(
         hass, DOMAIN, SERVICE_ADD_TRANSACTION
     )
@@ -888,6 +840,7 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     assert description["fields"]["use_current_date"]["default"] is True
     assert description["fields"]["use_current_date"]["selector"] == {"boolean": {}}
     assert description["fields"]["date"]["default"] == "2026-05-06"
+    assert entry.state is ConfigEntryState.LOADED
     _current_local_date.assert_called_once_with()
     assert (
         "My Payee"
@@ -895,11 +848,13 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     )
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_set_add_transaction_service_schema_handles_bad_options() -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    await async_setup(hass, {})
+async def test_set_add_transaction_service_schema_handles_bad_options(
+    hass: HomeAssistant,
+) -> None:
+    await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
 
     _set_add_transaction_service_schema(
         hass,
@@ -923,28 +878,39 @@ async def test_set_add_transaction_service_schema_handles_bad_options() -> None:
     assert description["fields"]["payee_name"]["selector"]["select"]["options"] == []
 
 
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
-async def test_async_unload_entry_false_does_not_remove_services(
-    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+async def test_config_entry_setup_registers_entity_and_device(
+    hass: HomeAssistant,
 ) -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    fake_hass.config_entries.unload_result = False
-    entry = config_entry_factory(runtime_data=RuntimeData(token="token", db_path=""))
-    fake_hass.data[DOMAIN] = {"entry-1": entry.runtime_data}
+    entry = await setup_integration(hass)
+    entity_id = "sensor.manager_for_ynab_pending_income_updated_count"
 
-    unload_ok = await async_unload_entry(hass, entry)
+    state = hass.states.get(entity_id)
+    entity_entry = er.async_get(hass).async_get(entity_id)
+    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
 
-    assert unload_ok is False
-    assert fake_hass.data[DOMAIN] == {"entry-1": entry.runtime_data}
+    assert state is not None
+    assert state.state == "unknown"
+    assert entity_entry is not None
+    assert entity_entry.unique_id == f"{entry.entry_id}_pending_income_updated_count"
+    assert device is not None
+    assert device.name == "Manager for YNAB"
 
 
-def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
+@pytest.mark.usefixtures("enable_custom_integrations")
+@pytest.mark.asyncio
+async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> None:
+    await async_setup_component(hass, DOMAIN, {})
+    await hass.async_block_till_done()
 
     with pytest.raises(HomeAssistantError, match="Manager for YNAB is not configured"):
-        _get_runtime_data(hass)
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_PENDING_INCOME,
+            {"for_real": False, "sync": False, "quiet": False},
+            blocking=True,
+        )
 
 
 @patch(
@@ -971,6 +937,7 @@ def test_get_runtime_data_raises_without_a_loaded_entry() -> None:
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
     return_value=AutoApproveResult(transactions=[], updated_count=0),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_register_services_success_and_idempotence(
     run_auto_approve: Mock,
@@ -979,73 +946,59 @@ async def test_register_services_success_and_idempotence(
     run_add_transaction: Mock,
     get_add_transaction_options: AsyncMock,
     run_sql_query: AsyncMock,
-    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+    hass: HomeAssistant,
 ) -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    runtime_data = RuntimeData(token="token", db_path="/tmp/db.sqlite3")
-    fake_hass.data[DOMAIN] = {"entry-1": runtime_data}
-    entry = config_entry_factory(runtime_data=runtime_data)
+    await setup_integration(hass)
 
-    await _async_register_services(hass)
-    await _async_register_services(hass)
-
-    pending = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_AUTO_APPROVE,
+        {"for_real": True, "sync": True, "quiet": True},
+        blocking=True,
     )
-    auto_approve = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_PENDING_INCOME,
+        {"for_real": True, "sync": True, "quiet": True},
+        blocking=True,
     )
-    sqlite_export = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_EXPORT)]["handler"],
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SQLITE_EXPORT,
+        {"full_refresh": True, "quiet": False},
+        blocking=True,
     )
-    sqlite_query = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_SQLITE_QUERY)]["handler"],
+    result = await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SQLITE_QUERY,
+        {"sync": True, "sql": "select 1"},
+        blocking=True,
+        return_response=True,
     )
-    add_transaction = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
-    )
-
-    await auto_approve(
-        FakeServiceCall(data={"for_real": True, "sync": True, "quiet": True})
-    )
-    await pending(FakeServiceCall(data={"for_real": True, "sync": True, "quiet": True}))
-    await sqlite_export(FakeServiceCall(data={"full_refresh": True, "quiet": False}))
-    result = await sqlite_query(
-        FakeServiceCall(
-            data={
-                "sync": True,
-                "sql": "select 1",
-            }
-        )
-    )
-    await add_transaction(
-        FakeServiceCall(
-            data={
-                "plan_name": "Budget",
-                "account_name": "Checking",
-                "payee_name": "Store",
-                "category_name": "Food - Groceries",
-                "use_current_date": False,
-                "date": datetime.date(2026, 5, 1),
-                "cleared": "uncleared",
-                "amount": Decimal("12.34"),
-                "sync": True,
-                "quiet": True,
-            }
-        )
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_ADD_TRANSACTION,
+        {
+            "plan_name": "Budget",
+            "account_name": "Checking",
+            "payee_name": "Store",
+            "category_name": "Food - Groceries",
+            "use_current_date": False,
+            "date": "2026-05-01",
+            "cleared": "uncleared",
+            "amount": "12.34",
+            "sync": True,
+            "quiet": True,
+        },
+        blocking=True,
     )
 
-    await fake_hass.async_block_till_done()
+    await hass.async_block_till_done()
 
     assert result == {"rows": [{"id": 1}]}
-    assert len(fake_hass.services.registered) == 5
-    assert entry.runtime_data.pending_income_updated_count == 4
+    state = hass.states.get("sensor.manager_for_ynab_pending_income_updated_count")
+    assert state is not None
+    assert state.state == "4"
     run_auto_approve.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
@@ -1083,13 +1036,8 @@ async def test_register_services_success_and_idempotence(
         sync=True,
         quiet=True,
     )
-    assert get_add_transaction_options.await_count == 5
-    get_add_transaction_options.assert_has_awaits([call(Path("/tmp/db.sqlite3"))] * 5)
-
-
-@pytest.mark.asyncio
-async def test_fake_hass_block_till_done_without_tasks() -> None:
-    await FakeHass().async_block_till_done()
+    assert get_add_transaction_options.await_count == 6
+    get_add_transaction_options.assert_has_awaits([call(Path("/tmp/db.sqlite3"))] * 6)
 
 
 @patch(
@@ -1103,53 +1051,48 @@ async def test_fake_hass_block_till_done_without_tasks() -> None:
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
     return_value=AutoApproveResult(transactions=[], updated_count=0),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_register_services_sync_false_skips_schema_refresh(
-    run_auto_approve: Mock, run_pending_income: Mock, run_add_transaction: Mock
+    run_auto_approve: Mock,
+    run_pending_income: Mock,
+    run_add_transaction: Mock,
+    hass: HomeAssistant,
 ) -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    fake_hass.data[DOMAIN] = {
-        "entry-1": RuntimeData(token="token", db_path="/tmp/db.sqlite3")
-    }
+    await setup_integration(hass)
 
-    await _async_register_services(hass)
-
-    pending = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_PENDING_INCOME)]["handler"],
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_AUTO_APPROVE,
+        {"for_real": True, "sync": False, "quiet": True},
+        blocking=True,
     )
-    auto_approve = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_AUTO_APPROVE)]["handler"],
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_PENDING_INCOME,
+        {"for_real": True, "sync": False, "quiet": True},
+        blocking=True,
     )
-    add_transaction = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
-    )
-
-    await auto_approve(
-        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
-    )
-    await pending(
-        FakeServiceCall(data={"for_real": True, "sync": False, "quiet": True})
-    )
-    await add_transaction(
-        FakeServiceCall(
-            data={
-                "account_name": "Checking",
-                "payee_name": "Store",
-                "date": datetime.date(2026, 5, 1),
-                "cleared": "uncleared",
-                "amount": Decimal("12.34"),
-                "sync": False,
-                "quiet": True,
-            }
-        )
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_ADD_TRANSACTION,
+        {
+            "account_name": "Checking",
+            "payee_name": "Store",
+            "date": "2026-05-01",
+            "cleared": "uncleared",
+            "amount": "12.34",
+            "sync": False,
+            "quiet": True,
+        },
+        blocking=True,
     )
 
-    assert fake_hass.tasks == []
-    assert fake_hass.data[DOMAIN]["entry-1"].pending_income_updated_count == 4
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.manager_for_ynab_pending_income_updated_count")
+    assert state is not None
+    assert state.state == "4"
     run_auto_approve.assert_called_once()
     run_pending_income.assert_called_once()
     run_add_transaction.assert_called_once()
@@ -1167,40 +1110,31 @@ async def test_register_services_sync_false_skips_schema_refresh(
     "custom_components.ha_manager_for_ynab._current_local_date",
     return_value=datetime.date(2026, 5, 6),
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_add_transaction_service_uses_current_date_by_default(
     _current_local_date: Mock,
     run_add_transaction: Mock,
     get_add_transaction_options: AsyncMock,
-    config_entry_factory: Callable[..., ConfigEntry[RuntimeData]],
+    hass: HomeAssistant,
 ) -> None:
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    await async_setup(hass, {})
-    entry = config_entry_factory(
-        data={CONF_TOKEN: "token", CONF_DB_PATH: "/tmp/db.sqlite3"}
-    )
-    await async_setup_entry(hass, entry)
-    add_transaction = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, SERVICE_ADD_TRANSACTION)]["handler"],
-    )
+    await setup_integration(hass)
 
-    await add_transaction(
-        FakeServiceCall(
-            data={
-                "plan_name": "Budget",
-                "account_name": "Checking",
-                "payee_name": "Store",
-                "category_name": "Food - Groceries",
-                "use_current_date": True,
-                "date": datetime.date(2026, 5, 1),
-                "cleared": "uncleared",
-                "amount": Decimal("12.34"),
-                "sync": False,
-                "quiet": True,
-            }
-        )
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_ADD_TRANSACTION,
+        {
+            "plan_name": "Budget",
+            "account_name": "Checking",
+            "payee_name": "Store",
+            "category_name": "Food - Groceries",
+            "use_current_date": True,
+            "cleared": "uncleared",
+            "amount": "12.34",
+            "sync": False,
+            "quiet": True,
+        },
+        blocking=True,
     )
 
     run_add_transaction.assert_called_once_with(
@@ -1216,8 +1150,8 @@ async def test_add_transaction_service_uses_current_date_by_default(
         sync=False,
         quiet=True,
     )
-    assert _current_local_date.call_count == 2
-    _current_local_date.assert_has_calls([call(), call()])
+    assert _current_local_date.call_count == 3
+    _current_local_date.assert_has_calls([call(), call(), call()])
     get_add_transaction_options.assert_awaited_once_with(Path("/tmp/db.sqlite3"))
 
 
@@ -1275,9 +1209,9 @@ async def test_add_transaction_service_uses_current_date_by_default(
                 "account_name": "Checking",
                 "payee_name": "Store",
                 "use_current_date": False,
-                "date": datetime.date(2026, 5, 1),
+                "date": "2026-05-01",
                 "cleared": "uncleared",
-                "amount": Decimal("12.34"),
+                "amount": "12.34",
                 "sync": False,
                 "quiet": True,
             },
@@ -1286,6 +1220,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
         ),
     ],
 )
+@pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
 async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: Mock,
@@ -1296,6 +1231,7 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     service_name: str,
     data: dict[str, object],
     match: str,
+    hass: HomeAssistant,
 ) -> None:
     del (
         run_auto_approve,
@@ -1304,17 +1240,13 @@ async def test_register_services_error_paths_raise_home_assistant_error(
         run_add_transaction,
         run_sql_query,
     )
-    fake_hass = FakeHass()
-    hass = cast("HomeAssistant", fake_hass)
-    fake_hass.data[DOMAIN] = {
-        "entry-1": RuntimeData(token="token", db_path="/tmp/db.sqlite3")
-    }
-
-    await _async_register_services(hass)
-    handler = cast(
-        "ServiceHandler",
-        fake_hass.services.registered[(DOMAIN, service_name)]["handler"],
-    )
+    await setup_integration(hass)
 
     with pytest.raises(HomeAssistantError, match=match):
-        await handler(FakeServiceCall(data=data))
+        await hass.services.async_call(
+            DOMAIN,
+            service_name,
+            data,
+            blocking=True,
+            return_response=service_name == SERVICE_SQLITE_QUERY,
+        )

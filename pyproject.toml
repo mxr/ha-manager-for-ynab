@@ -17,6 +17,9 @@ module = "testing.*"
 disallow_untyped_defs = false
 module = "tests.*"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [tool.ruff]
 target-version = "py314"
 
@@ -103,4 +106,6 @@ deps = [
   "homeassistant",
   "pytest",
   "pytest-asyncio",
+  "pytest-homeassistant-custom-component",
 ]
+skip_install = true
