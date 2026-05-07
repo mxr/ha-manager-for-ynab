@@ -72,8 +72,8 @@ This executes the SQL against the configured SQLite DB path and returns rows as 
 - `account_name`: required
 - `payee_name`: required
 - `category_name`: shown by default, formatted as `Category Group - Category Name`; ignored when the payee is another account, which makes the transaction a transfer
-- `use_current_date`: default `true`; when enabled, the transaction uses the current date in Home Assistant's local timezone
-- `date`: required, default today; used when `use_current_date` is `false`
+- `use_current_date`: default `true`; when enabled, the transaction uses the current date in Home Assistant's local timezone and ignores `date`
+- `date`: required, default today; picker value used only when `use_current_date` is `false`
 - `cleared`: default `uncleared`
 - `amount`: required, positive values are expenses
 - `sync`: default `true`

@@ -95,7 +95,7 @@ add_transaction:
         text:
     use_current_date:
       required: true
-      description: Use the current date in Home Assistant's local timezone.
+      description: Use the current date in Home Assistant's local timezone. When enabled, date is ignored.
       default: true
       example: true
       selector:
@@ -103,7 +103,7 @@ add_transaction:
     date:
       required: true
       example: '2026-05-01'
-      description: Date to use when use_current_date is false.
+      description: Date picker value to use only when use_current_date is false.
       selector:
         date:
     cleared:

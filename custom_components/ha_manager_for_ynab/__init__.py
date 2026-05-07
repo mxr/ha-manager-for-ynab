@@ -390,14 +390,14 @@ def _set_add_transaction_service_schema(
                 },
                 ATTR_USE_CURRENT_DATE: {
                     "name": "Use current date",
-                    "description": "Use the current date in Home Assistant's local timezone when creating the transaction.",
+                    "description": "Use the current date in Home Assistant's local timezone. When enabled, Date is ignored.",
                     "required": True,
                     "default": True,
                     "selector": {"boolean": {}},
                 },
                 ATTR_DATE: {
                     "name": "Date",
-                    "description": "Transaction date to use when Use current date is off.",
+                    "description": "Date picker value to use only when Use current date is off.",
                     "required": True,
                     "default": _current_local_date().isoformat(),
                     "selector": {"date": {}},
