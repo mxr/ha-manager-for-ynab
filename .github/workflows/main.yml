@@ -103,18 +103,3 @@ jobs:
     with:
       env: '["py314"]'
       os: windows-latest
-  main-win:
-    needs: [changes, main-win-real]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-    - env:
-        PROJECT_FILES: ${{ needs.changes.outputs.project_files }}
-        MAIN_WIN_REAL_RESULT: ${{ needs.main-win-real.result }}
-      run: |
-        if [ "$PROJECT_FILES" != "true" ]; then
-          exit 0
-        fi
-        if [ "$MAIN_WIN_REAL_RESULT" != "success" ]; then
-          exit 1
-        fi
