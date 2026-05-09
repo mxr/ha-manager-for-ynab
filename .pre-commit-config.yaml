@@ -49,3 +49,8 @@ repos:
     - manager-for-ynab>=1.6.5
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab>=2.7.1
+- repo: https://github.com/zizmorcore/zizmor-pre-commit
+  rev: v1.24.1
+  hooks:
+  - id: zizmor
+    args: [--no-progress, --fix]
