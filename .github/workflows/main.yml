@@ -25,7 +25,7 @@ jobs:
             - '**/*.py'
             - .pre-commit-config.yaml
           project_files:
-            - .github/workflows/**
+            - .github/workflows/main.yml
             - '**/*.py'
             - '**/*.toml'
             - '**/*requirements*.txt'
