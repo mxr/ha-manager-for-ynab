@@ -16,6 +16,12 @@
   },
   "entity": {
     "sensor": {
+      "auto_approve_approved_count": {
+        "name": "Auto approve approved count"
+      },
+      "auto_approve_cleared_count": {
+        "name": "Auto approve cleared count"
+      },
       "pending_income_updated_count": {
         "name": "Pending income updated count"
       }

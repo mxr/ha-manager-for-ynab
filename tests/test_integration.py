@@ -46,6 +46,8 @@ from custom_components.ha_manager_for_ynab.const import SERVICE_AUTO_APPROVE
 from custom_components.ha_manager_for_ynab.const import SERVICE_PENDING_INCOME
 from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_EXPORT
 from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_QUERY
+from custom_components.ha_manager_for_ynab.sensor import AutoApproveApprovedCountSensor
+from custom_components.ha_manager_for_ynab.sensor import AutoApproveClearedCountSensor
 from custom_components.ha_manager_for_ynab.sensor import PendingIncomeUpdatedCountSensor
 from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
@@ -60,6 +62,8 @@ ADD_TRANSACTION_SINGLE_PLAN_SEED = (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -118,6 +122,64 @@ def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
     assert seen == [3]
 
 
+def test_runtime_data_notifies_listeners_on_auto_approve_update() -> None:
+    runtime_data = RuntimeData(token="token", db_path="")
+    seen: list[tuple[int | None, int | None]] = []
+
+    def listener() -> None:
+        seen.append(
+            (
+                runtime_data.auto_approve_approved_count,
+                runtime_data.auto_approve_cleared_count,
+            )
+        )
+
+    runtime_data.async_add_listener(listener)
+    runtime_data.async_set_auto_approve_counts(
+        AutoApproveResult(transactions=[], updated_count=3, cleared=2)
+    )
+
+    assert runtime_data.auto_approve_approved_count == 3
+    assert runtime_data.auto_approve_cleared_count == 2
+    assert seen == [(3, 2)]
+
+
+@pytest.mark.parametrize(
+    ("setter", "expected_seen"),
+    [
+        pytest.param(
+            lambda runtime_data: runtime_data.async_set_auto_approve_approved_count(3),
+            [(3, None)],
+            id="approved",
+        ),
+        pytest.param(
+            lambda runtime_data: runtime_data.async_set_auto_approve_cleared_count(2),
+            [(None, 2)],
+            id="cleared",
+        ),
+    ],
+)
+def test_runtime_data_notifies_listeners_on_restored_auto_approve_count(
+    setter: Callable[[RuntimeData], None],
+    expected_seen: list[tuple[int | None, int | None]],
+) -> None:
+    runtime_data = RuntimeData(token="token", db_path="")
+    seen: list[tuple[int | None, int | None]] = []
+
+    def listener() -> None:
+        seen.append(
+            (
+                runtime_data.auto_approve_approved_count,
+                runtime_data.auto_approve_cleared_count,
+            )
+        )
+
+    runtime_data.async_add_listener(listener)
+    setter(runtime_data)
+
+    assert seen == expected_seen
+
+
 def test_pending_income_sensor_reads_runtime_state() -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
     runtime_data.async_set_pending_income_updated_count(5)
@@ -125,6 +187,36 @@ def test_pending_income_sensor_reads_runtime_state() -> None:
     sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
 
     assert sensor.native_value == 5
+
+
+@pytest.mark.parametrize(
+    ("sensor_cls", "setter", "expected"),
+    [
+        pytest.param(
+            AutoApproveApprovedCountSensor,
+            lambda runtime_data: runtime_data.async_set_auto_approve_approved_count(5),
+            5,
+            id="approved",
+        ),
+        pytest.param(
+            AutoApproveClearedCountSensor,
+            lambda runtime_data: runtime_data.async_set_auto_approve_cleared_count(4),
+            4,
+            id="cleared",
+        ),
+    ],
+)
+def test_auto_approve_sensor_reads_runtime_state(
+    sensor_cls: type[AutoApproveApprovedCountSensor | AutoApproveClearedCountSensor],
+    setter: Callable[[RuntimeData], None],
+    expected: int,
+) -> None:
+    runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
+    setter(runtime_data)
+
+    sensor = sensor_cls(runtime_data, "entry-1")
+
+    assert sensor.native_value == expected
 
 
 @patch.object(PendingIncomeUpdatedCountSensor, "async_write_ha_state", autospec=True)
@@ -212,8 +304,10 @@ async def test_sensor_async_setup_entry_adds_entity() -> None:
         cast("AddConfigEntryEntitiesCallback", add_entities),
     )
 
-    assert len(added) == 1
+    assert len(added) == 3
     assert isinstance(added[0], PendingIncomeUpdatedCountSensor)
+    assert isinstance(added[1], AutoApproveApprovedCountSensor)
+    assert isinstance(added[2], AutoApproveClearedCountSensor)
 
 
 @patch(
@@ -885,15 +979,43 @@ async def test_config_entry_setup_registers_entity_and_device(
 ) -> None:
     entry = await setup_integration(hass)
     entity_id = "sensor.manager_for_ynab_pending_income_updated_count"
+    auto_approve_approved_entity_id = (
+        "sensor.manager_for_ynab_auto_approve_approved_count"
+    )
+    auto_approve_cleared_entity_id = (
+        "sensor.manager_for_ynab_auto_approve_cleared_count"
+    )
 
     state = hass.states.get(entity_id)
     entity_entry = er.async_get(hass).async_get(entity_id)
+    auto_approve_approved_state = hass.states.get(auto_approve_approved_entity_id)
+    auto_approve_approved_entity_entry = er.async_get(hass).async_get(
+        auto_approve_approved_entity_id
+    )
+    auto_approve_cleared_state = hass.states.get(auto_approve_cleared_entity_id)
+    auto_approve_cleared_entity_entry = er.async_get(hass).async_get(
+        auto_approve_cleared_entity_id
+    )
     device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
 
     assert state is not None
     assert state.state == "unknown"
     assert entity_entry is not None
     assert entity_entry.unique_id == f"{entry.entry_id}_pending_income_updated_count"
+    assert auto_approve_approved_state is not None
+    assert auto_approve_approved_state.state == "unknown"
+    assert auto_approve_approved_entity_entry is not None
+    assert (
+        auto_approve_approved_entity_entry.unique_id
+        == f"{entry.entry_id}_auto_approve_approved_count"
+    )
+    assert auto_approve_cleared_state is not None
+    assert auto_approve_cleared_state.state == "unknown"
+    assert auto_approve_cleared_entity_entry is not None
+    assert (
+        auto_approve_cleared_entity_entry.unique_id
+        == f"{entry.entry_id}_auto_approve_cleared_count"
+    )
     assert device is not None
     assert device.name == "Manager for YNAB"
 
@@ -935,7 +1057,7 @@ async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> Non
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-    return_value=AutoApproveResult(transactions=[], updated_count=0, cleared=0),
+    return_value=AutoApproveResult(transactions=[], updated_count=3, cleared=2),
 )
 @pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
@@ -997,8 +1119,18 @@ async def test_register_services_success_and_idempotence(
 
     assert result == {"rows": [{"id": 1}]}
     state = hass.states.get("sensor.manager_for_ynab_pending_income_updated_count")
+    auto_approve_approved_state = hass.states.get(
+        "sensor.manager_for_ynab_auto_approve_approved_count"
+    )
+    auto_approve_cleared_state = hass.states.get(
+        "sensor.manager_for_ynab_auto_approve_cleared_count"
+    )
     assert state is not None
     assert state.state == "4"
+    assert auto_approve_approved_state is not None
+    assert auto_approve_approved_state.state == "3"
+    assert auto_approve_cleared_state is not None
+    assert auto_approve_cleared_state.state == "2"
     run_auto_approve.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
@@ -1049,7 +1181,7 @@ async def test_register_services_success_and_idempotence(
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-    return_value=AutoApproveResult(transactions=[], updated_count=0, cleared=0),
+    return_value=AutoApproveResult(transactions=[], updated_count=3, cleared=2),
 )
 @pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
@@ -1091,8 +1223,18 @@ async def test_register_services_sync_false_skips_schema_refresh(
     await hass.async_block_till_done()
 
     state = hass.states.get("sensor.manager_for_ynab_pending_income_updated_count")
+    auto_approve_approved_state = hass.states.get(
+        "sensor.manager_for_ynab_auto_approve_approved_count"
+    )
+    auto_approve_cleared_state = hass.states.get(
+        "sensor.manager_for_ynab_auto_approve_cleared_count"
+    )
     assert state is not None
     assert state.state == "4"
+    assert auto_approve_approved_state is not None
+    assert auto_approve_approved_state.state == "3"
+    assert auto_approve_cleared_state is not None
+    assert auto_approve_cleared_state.state == "2"
     run_auto_approve.assert_called_once()
     run_pending_income.assert_called_once()
     run_add_transaction.assert_called_once()
