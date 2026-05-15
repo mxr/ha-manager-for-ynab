@@ -295,14 +295,14 @@ async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
 @patch(
     "custom_components.ha_manager_for_ynab._api.auto_approve",
     new_callable=AsyncMock,
-    return_value=AutoApproveResult(transactions=[], updated_count=9),
+    return_value=AutoApproveResult(transactions=[], updated_count=9, cleared=0),
 )
 @pytest.mark.asyncio
 async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
     ret = await _api.run_auto_approve(
         "token", Path("/tmp/db.sqlite3"), for_real=True, sync=False, quiet=False
     )
-    assert ret == AutoApproveResult(transactions=[], updated_count=9)
+    assert ret == AutoApproveResult(transactions=[], updated_count=9, cleared=0)
     auto_approve.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
@@ -935,7 +935,7 @@ async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> Non
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-    return_value=AutoApproveResult(transactions=[], updated_count=0),
+    return_value=AutoApproveResult(transactions=[], updated_count=0, cleared=0),
 )
 @pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
@@ -1049,7 +1049,7 @@ async def test_register_services_success_and_idempotence(
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
-    return_value=AutoApproveResult(transactions=[], updated_count=0),
+    return_value=AutoApproveResult(transactions=[], updated_count=0, cleared=0),
 )
 @pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.asyncio
