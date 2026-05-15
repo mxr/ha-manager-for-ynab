@@ -11,7 +11,7 @@ Manager for YNAB is a Home Assistant custom integration for running `manager-for
 - `sqlite_export` action with `full_refresh` and `quiet`
 - `sqlite_query` action with arbitrary SQL and optional sync
 - `add_transaction` action with values resolved from the SQLite export
-- Sensor for the latest `pending_income` updated count
+- Sensors for the latest `pending_income` updated count and `auto_approve` approved and cleared counts
 
 If the configured DB path is empty, the integration uses `sqlite-export-for-ynab`'s default database path.
 
@@ -42,7 +42,7 @@ Leave the DB path empty to use the default path from `sqlite-export-for-ynab`.
 - `sync`: default `true`
 - `quiet`: default `false`
 
-This runs `manager-for-ynab.auto_approve.auto_approve(...)`.
+This runs `manager-for-ynab.auto_approve.auto_approve(...)` and updates the sensors to the returned `updated_count` and `cleared` counts.
 
 ### `pending_income`
 

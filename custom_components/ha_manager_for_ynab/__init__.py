@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.helpers.typing import ConfigType
+    from manager_for_ynab.auto_approve import AutoApproveResult
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -108,6 +109,8 @@ class RuntimeData:
     token: str
     db_path: str
     pending_income_updated_count: int | None = None
+    auto_approve_approved_count: int | None = None
+    auto_approve_cleared_count: int | None = None
     _listeners: list[Callable[[], None]] = field(default_factory=list)
 
     @callback
@@ -126,6 +129,28 @@ class RuntimeData:
     def async_set_pending_income_updated_count(self, updated_count: int) -> None:
         """Store the last successful pending income count."""
         self.pending_income_updated_count = updated_count
+        for listener in list(self._listeners):
+            listener()
+
+    @callback
+    def async_set_auto_approve_counts(self, result: AutoApproveResult) -> None:
+        """Store the last successful auto approve counts."""
+        self.auto_approve_approved_count = result.updated_count
+        self.auto_approve_cleared_count = result.cleared
+        for listener in list(self._listeners):
+            listener()
+
+    @callback
+    def async_set_auto_approve_approved_count(self, approved_count: int) -> None:
+        """Store the last successful auto approve approved count."""
+        self.auto_approve_approved_count = approved_count
+        for listener in list(self._listeners):
+            listener()
+
+    @callback
+    def async_set_auto_approve_cleared_count(self, cleared_count: int) -> None:
+        """Store the last successful auto approve cleared count."""
+        self.auto_approve_cleared_count = cleared_count
         for listener in list(self._listeners):
             listener()
 
@@ -187,7 +212,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def async_handle_auto_approve(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
-            await _api.run_auto_approve(
+            result = await _api.run_auto_approve(
                 runtime_data.token,
                 Path(runtime_data.db_path),
                 for_real=call.data["for_real"],
@@ -198,6 +223,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("auto_approve failed")
             raise HomeAssistantError(f"auto_approve failed: {err}") from err
 
+        runtime_data.async_set_auto_approve_counts(result)
         if call.data["sync"]:
             _schedule_update_add_transaction_service_schema(hass, runtime_data)
 
