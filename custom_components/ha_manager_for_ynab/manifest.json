@@ -9,10 +9,10 @@
   "issue_tracker": "https://github.com/mxr/ha-manager-for-ynab/issues",
   "name": "Manager for YNAB",
   "requirements": [
-    "aiosqlite>=0.21.0",
-    "asyncio-for-ynab>=1.83.0",
-    "manager-for-ynab>=1.7.1",
-    "sqlite-export-for-ynab>=2.7.1"
+    "aiosqlite~=0.21.0",
+    "asyncio-for-ynab~=1.83.0",
+    "manager-for-ynab~=1.7.1",
+    "sqlite-export-for-ynab~=2.7.1"
   ],
   "version": "0.5.2"
 }
