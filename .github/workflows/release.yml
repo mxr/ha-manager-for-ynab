@@ -13,6 +13,6 @@ concurrency:
 
 jobs:
   release:
-    uses: mxr/workflows/.github/workflows/github-release.yml@f0281d9a23f65774fe530a52f03d5419ed871519 # v0.1.0
+    uses: mxr/workflows/.github/workflows/github-release.yml@440bfbaaa50585f30da0926ae20f10a7727a3b7f # v0.1.2
     permissions:
       contents: write
