@@ -45,7 +45,7 @@ repos:
     - aiosqlite~=0.21.0
     - asyncio-for-ynab~=1.84.0
     - homeassistant-stubs
-    - manager-for-ynab~=1.8.1
+    - manager-for-ynab~=1.8.2
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab~=2.9.0
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
