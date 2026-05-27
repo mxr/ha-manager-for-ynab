@@ -14,5 +14,5 @@
     "manager-for-ynab~=1.8.2",
     "sqlite-export-for-ynab~=2.9.0"
   ],
-  "version": "0.7.0"
+  "version": "0.8.0"
 }
