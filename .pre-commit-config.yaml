@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.14
 ci:
-  skip: [mypy]  # venv is too big; runs with gihub action instead
+  skip: [mypy, ty]  # venv is too big; runs with gihub action instead
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -20,11 +20,6 @@ repos:
     args: [--autofix, --trailing-commas]
   - id: pretty-format-yaml
     args: [--autofix]
-- repo: https://github.com/asottile/setup-cfg-fmt
-  rev: 9339507e9522e953c07479c9f6abeec0f2fe4e12  # frozen: v3.2.0
-  hooks:
-  - id: setup-cfg-fmt
-    args: [--min-py-version, '3.14']
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: 3b3f7c3f57fe9925356faf5fe6230835138be230  # frozen: v0.15.17
   hooks:
@@ -36,7 +31,20 @@ repos:
   hooks:
   - id: sqlfluff-fix
     args: [--dialect, sqlite]
-
+- repo: https://github.com/mxr/mirrors-ty
+  rev: 8d65f680939768b9b5de1c206b315c6e8f7e0328  # frozen: v0.0.49
+  hooks:
+  - id: ty
+    additional_dependencies:
+    - aiosqlite~=0.21.0
+    - asyncio-for-ynab~=1.84.0
+    - coverage
+    - homeassistant-stubs
+    - manager-for-ynab~=1.8.5
+    - pytest
+    - pytest-asyncio
+    - pytest-homeassistant-custom-component
+    - sqlite-export-for-ynab~=2.9.0
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # frozen: v2.1.0
   hooks:
@@ -44,10 +52,17 @@ repos:
     additional_dependencies:
     - aiosqlite~=0.21.0
     - asyncio-for-ynab~=1.84.0
+    - coverage
     - homeassistant-stubs
     - manager-for-ynab~=1.8.5
+    - pytest
+    - pytest-asyncio
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab~=2.9.0
+- repo: https://github.com/mxr/sync-typing-deps
+  rev: 34b664ec01850e0d9cb4fe97c1a03d8ed71f393c  # frozen: v0.5.0
+  hooks:
+  - id: sync-typing-deps
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
   rev: 9257c6050c0261b8c57e712f632dc4a8010109a9  # frozen: v1.25.2
   hooks:

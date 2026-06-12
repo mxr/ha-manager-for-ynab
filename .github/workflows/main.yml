@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       project_files: ${{ steps.filter.outputs.project_files }}
-      mypy_linting_files: ${{ steps.filter.outputs.mypy_linting_files }}
+      typing_linting_files: ${{ steps.filter.outputs.typing_linting_files }}
     steps:
     - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       with:
@@ -21,7 +21,7 @@ jobs:
       id: filter
       with:
         filters: |
-          mypy_linting_files:
+          typing_linting_files:
             - '**/*.py'
             - .pre-commit-config.yaml
           project_files:
@@ -32,23 +32,23 @@ jobs:
             - '**/setup.cfg'
             - custom_components/*/manifest.json
             - tox.ini
-  pre-commit-mypy-real:
+  pre-commit-typing-real:
     needs: [changes]
-    if: needs.changes.outputs.mypy_linting_files == 'true'
-    uses: mxr/workflows/.github/workflows/pre-commit-mypy.yml@440bfbaaa50585f30da0926ae20f10a7727a3b7f # v0.1.2
-  pre-commit-mypy:
-    needs: [changes, pre-commit-mypy-real]
+    if: needs.changes.outputs.typing_linting_files == 'true'
+    uses: mxr/workflows/.github/workflows/pre-commit-typing.yml@4f57658477fc69ee1912c6f1d9f43c807bee852a # v0.1.3
+  pre-commit-typing:
+    needs: [changes, pre-commit-typing-real]
     if: always()
     runs-on: ubuntu-latest
     steps:
     - env:
-        MYPY_LINTING_FILES: ${{ needs.changes.outputs.mypy_linting_files }}
-        PRE_COMMIT_MYPY_REAL_RESULT: ${{ needs.pre-commit-mypy-real.result }}
+        TYPING_LINTING_FILES: ${{ needs.changes.outputs.typing_linting_files }}
+        PRE_COMMIT_TYPING_REAL_RESULT: ${{ needs.pre-commit-typing-real.result }}
       run: |
-        if [ "$MYPY_LINTING_FILES" != "true" ]; then
+        if [ "$TYPING_LINTING_FILES" != "true" ]; then
           exit 0
         fi
-        if [ "$PRE_COMMIT_MYPY_REAL_RESULT" != "success" ]; then
+        if [ "$PRE_COMMIT_TYPING_REAL_RESULT" != "success" ]; then
           exit 1
         fi
   main-real:
