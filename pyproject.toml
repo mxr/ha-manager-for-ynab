@@ -112,3 +112,6 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", *manifest["requir
 ]
 dependency_groups = ["test"]
 skip_install = true
+
+[tool.ty.rules]
+all = "error"
