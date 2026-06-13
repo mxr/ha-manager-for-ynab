@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from typing import TYPE_CHECKING
+from typing import override
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.components.sensor import SensorEntityDescription
@@ -89,6 +90,7 @@ class ManagerForYnabCountSensor(RestoreEntity, SensorEntity):
             entry_type=DeviceEntryType.SERVICE,
         )
 
+    @override
     async def async_added_to_hass(self) -> None:
         """Register update callback when added."""
         await super().async_added_to_hass()
@@ -105,6 +107,7 @@ class ManagerForYnabCountSensor(RestoreEntity, SensorEntity):
             self._runtime_data.async_add_listener(self.async_write_ha_state)
         )
 
+    @override
     @property
     def native_value(self) -> int | None:
         """Return the latest count."""
