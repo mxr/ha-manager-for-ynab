@@ -60,7 +60,7 @@ repos:
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab~=2.9.0
 - repo: https://github.com/mxr/sync-typing-deps
-  rev: 34b664ec01850e0d9cb4fe97c1a03d8ed71f393c  # frozen: v0.5.0
+  rev: 15d110e7034a52d6a141f23e436e31156d4f9959  # frozen: v0.5.2
   hooks:
   - id: sync-typing-deps
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
