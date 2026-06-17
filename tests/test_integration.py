@@ -336,6 +336,7 @@ def test_service_schemas_default_values(_current_local_date: Mock) -> None:
         "date": datetime.date(2026, 5, 6),
         "cleared": "uncleared",
         "amount": Decimal("12.34"),
+        "fund": True,
         "sync": True,
         "quiet": False,
     }
@@ -531,6 +532,7 @@ async def test_api_run_add_transaction(
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
+        fund=True,
         sync=True,
         quiet=True,
     )
@@ -582,6 +584,7 @@ async def test_api_run_add_transaction_raises_on_nonzero_result(
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
+            fund=True,
             sync=False,
             quiet=False,
         )
@@ -611,6 +614,7 @@ async def test_api_run_add_transaction_ignores_transfer_category(
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
+        fund=True,
         sync=False,
         quiet=False,
     )
@@ -620,7 +624,6 @@ async def test_api_run_add_transaction_ignores_transfer_category(
     assert resolved.category is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("seed_path", "plan_name", "account_name", "category_name", "match"),
     [
@@ -681,6 +684,7 @@ async def test_api_run_add_transaction_raises(
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
+            fund=True,
             sync=False,
             quiet=False,
         )
@@ -709,6 +713,7 @@ async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
+        fund=True,
         sync=False,
         quiet=False,
     )
@@ -734,6 +739,7 @@ async def test_api_run_add_transaction_without_plans_raises(tmp_path: Path) -> N
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
+            fund=True,
             sync=False,
             quiet=False,
         )
@@ -761,6 +767,7 @@ async def test_api_run_add_transaction_explicit_plan_no_sync(
         date=datetime.date(2026, 5, 1),
         cleared="cleared",
         amount=Decimal("12.34"),
+        fund=True,
         sync=False,
         quiet=False,
     )
@@ -1159,6 +1166,7 @@ async def test_register_services_success_and_idempotence(
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
+        fund=True,
         sync=True,
         quiet=True,
     )
@@ -1283,6 +1291,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
         date=datetime.date(2026, 5, 6),
         cleared="uncleared",
         amount=Decimal("12.34"),
+        fund=True,
         sync=False,
         quiet=True,
     )
