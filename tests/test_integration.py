@@ -621,69 +621,63 @@ async def test_api_run_add_transaction_ignores_transfer_category(
 
 
 @pytest.mark.asyncio
-async def test_api_run_add_transaction_missing_account_raises(
+@pytest.mark.parametrize(
+    ("seed_path", "plan_name", "account_name", "category_name", "match"),
+    [
+        pytest.param(
+            ADD_TRANSACTION_SEED,
+            "Empty Budget",
+            "Checking",
+            None,
+            "No open account named 'Checking' found in selected plan",
+            id="missing_account",
+        ),
+        pytest.param(
+            ADD_TRANSACTION_SEED,
+            "Missing Budget",
+            "Checking",
+            "Bills - Electric",
+            "No plan named 'Missing Budget' found",
+            id="missing_plan",
+        ),
+        pytest.param(
+            ADD_TRANSACTION_SEED,
+            None,
+            "Checking A",
+            None,
+            "Plan name is required when SQLite export has multiple plans",
+            id="multiple_plans_requires_plan_name",
+        ),
+        pytest.param(
+            ADD_TRANSACTION_NO_PLANS_SEED,
+            None,
+            "Checking",
+            None,
+            "No plans found in SQLite export",
+            id="without_plans",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_raises(
+    seed_path: Path,
+    plan_name: str | None,
+    account_name: str,
+    category_name: str | None,
+    match: str,
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    seed_db(db_path, seed_path)
 
-    with pytest.raises(
-        RuntimeError, match="No open account named 'Checking' found in selected plan"
-    ):
+    with pytest.raises(RuntimeError, match=match):
         await _api.run_add_transaction(
             "token",
             db_path,
-            plan_name="Empty Budget",
-            account_name="Checking",
+            plan_name=plan_name,
+            account_name=account_name,
             payee_name="Power Co",
-            category_name=None,
-            date=datetime.date(2026, 5, 1),
-            cleared="uncleared",
-            amount=Decimal("12.34"),
-            sync=False,
-            quiet=False,
-        )
-
-
-@pytest.mark.asyncio
-async def test_api_run_add_transaction_missing_plan_raises(tmp_path: Path) -> None:
-    db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
-
-    with pytest.raises(RuntimeError, match="No plan named 'Missing Budget' found"):
-        await _api.run_add_transaction(
-            "token",
-            db_path,
-            plan_name="Missing Budget",
-            account_name="Checking",
-            payee_name="Power Co",
-            category_name="Bills - Electric",
-            date=datetime.date(2026, 5, 1),
-            cleared="uncleared",
-            amount=Decimal("12.34"),
-            sync=False,
-            quiet=False,
-        )
-
-
-@pytest.mark.asyncio
-async def test_api_run_add_transaction_multiple_plans_requires_plan_name(
-    tmp_path: Path,
-) -> None:
-    db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
-
-    with pytest.raises(
-        RuntimeError,
-        match="Plan name is required when SQLite export has multiple plans",
-    ):
-        await _api.run_add_transaction(
-            "token",
-            db_path,
-            plan_name=None,
-            account_name="Checking A",
-            payee_name="Power Co",
-            category_name=None,
+            category_name=category_name,
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
