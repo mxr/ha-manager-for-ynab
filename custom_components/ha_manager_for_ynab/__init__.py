@@ -386,21 +386,41 @@ def _set_add_transaction_service_schema(
     description = copy.deepcopy(_add_transaction_service_description())
     fields = description["fields"]
 
-    fields[ATTR_PLAN_NAME]["selector"] = {
-        "select": {"options": plans, "mode": "dropdown"}
-    }
-    if isinstance(default_plan_name, str):
-        fields[ATTR_PLAN_NAME]["default"] = default_plan_name
-    fields[ATTR_ACCOUNT_NAME]["selector"] = {
-        "select": {"options": accounts, "mode": "dropdown"}
-    }
-    fields[ATTR_PAYEE_NAME]["selector"] = {
-        "select": {"options": payees, "custom_value": True, "mode": "dropdown"}
-    }
-    fields[ATTR_CATEGORY_NAME]["selector"] = {
-        "select": {"options": categories, "mode": "dropdown"}
-    }
-    fields[ATTR_DATE]["default"] = _current_local_date().isoformat()
+    fields.update(
+        {
+            ATTR_PLAN_NAME: {
+                **fields[ATTR_PLAN_NAME],
+                "selector": {"select": {"options": plans, "mode": "dropdown"}},
+                **(
+                    {"default": default_plan_name}
+                    if isinstance(default_plan_name, str)
+                    else {}
+                ),
+            },
+            ATTR_ACCOUNT_NAME: {
+                **fields[ATTR_ACCOUNT_NAME],
+                "selector": {"select": {"options": accounts, "mode": "dropdown"}},
+            },
+            ATTR_PAYEE_NAME: {
+                **fields[ATTR_PAYEE_NAME],
+                "selector": {
+                    "select": {
+                        "options": payees,
+                        "custom_value": True,
+                        "mode": "dropdown",
+                    }
+                },
+            },
+            ATTR_CATEGORY_NAME: {
+                **fields[ATTR_CATEGORY_NAME],
+                "selector": {"select": {"options": categories, "mode": "dropdown"}},
+            },
+            ATTR_DATE: {
+                **fields[ATTR_DATE],
+                "default": _current_local_date().isoformat(),
+            },
+        }
+    )
 
     service_helper.async_set_service_schema(
         hass, DOMAIN, SERVICE_ADD_TRANSACTION, description
