@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import copy
 import datetime
+import functools
 from dataclasses import dataclass
 from dataclasses import field
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.const import Platform
@@ -20,6 +23,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import service as service_helper
 from homeassistant.util import dt as dt_util
+from homeassistant.util.yaml import load_yaml_dict
 
 from . import _api
 from .const import ATTR_ACCOUNT_NAME
@@ -52,6 +56,21 @@ if TYPE_CHECKING:
     from manager_for_ynab.auto_approve import AutoApproveResult
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+SERVICES_YAML_PATH = Path(__file__).parent / "services.yaml"
+
+
+@functools.lru_cache
+def _add_transaction_service_description() -> dict[str, Any]:
+    """Return the static add_transaction service description from services.yaml.
+
+    Cached (no arguments, so this is a single cached value) because the
+    caller is a @callback that runs on the event loop and fires on every
+    setup, sqlite_export, and add_transaction call; without caching it would
+    do a blocking file read and YAML parse on the loop every time instead of
+    once per process.
+    """
+    services = load_yaml_dict(SERVICES_YAML_PATH)
+    return services[SERVICE_ADD_TRANSACTION]
 
 
 def _current_local_date() -> datetime.date:
@@ -358,120 +377,65 @@ async def _update_add_transaction_service_schema(
 def _set_add_transaction_service_schema(
     hass: HomeAssistant, options: dict[str, object]
 ) -> None:
-    """Set dynamic service metadata for add_transaction."""
+    """Set dynamic service metadata for add_transaction.
+
+    Only the fields below need live data from the SQLite export; every other
+    field's name/description/required/default comes straight from
+    services.yaml, so adding a new static field never requires touching this
+    function.
+    """
     plans = _as_string_list(options.get("plans"))
     accounts = _as_string_list(options.get("accounts"))
     categories = _as_string_list(options.get("categories"))
     payees = _as_string_list(options.get("payees"))
     default_plan_name = options.get("default_plan_name")
 
-    plan_field: dict[str, object] = {
-        "name": "Plan",
-        "description": "Plan name from the SQLite export. Optional when only one plan exists.",
-        "required": False,
-        "selector": {"select": {"options": plans, "mode": "dropdown"}},
-    }
-    if isinstance(default_plan_name, str):
-        plan_field["default"] = default_plan_name
+    description = copy.deepcopy(_add_transaction_service_description())
+    fields = description["fields"]
 
-    service_helper.async_set_service_schema(
-        hass,
-        DOMAIN,
-        SERVICE_ADD_TRANSACTION,
+    # These 4 fields use a text selector in services.yaml so the form stays
+    # usable if this dynamic update hasn't run yet (e.g. on first load before
+    # the SQLite export syncs). Swap each one to a select selector with the
+    # live options instead of mutating selector.select.options in place,
+    # since there's no select selector to mutate until we set one.
+    fields.update(
         {
-            "name": "Add transaction",
-            "description": "Create a YNAB transaction using choices from the SQLite export.",
-            "fields": {
-                ATTR_PLAN_NAME: plan_field,
-                ATTR_ACCOUNT_NAME: {
-                    "name": "Account",
-                    "description": "Account name from the SQLite export.",
-                    "required": True,
-                    "selector": {
-                        "select": {
-                            "options": accounts,
-                            "mode": "dropdown",
-                        }
-                    },
-                },
-                ATTR_PAYEE_NAME: {
-                    "name": "Payee",
-                    "description": "Payee name. Existing payees are resolved from the SQLite export.",
-                    "required": True,
-                    "selector": {
-                        "select": {
-                            "options": payees,
-                            "custom_value": True,
-                            "mode": "dropdown",
-                        }
-                    },
-                },
-                ATTR_CATEGORY_NAME: {
-                    "name": "Category",
-                    "description": "Category as category group and name separated by a hyphen. Ignored when the payee is another account, which makes the transaction a transfer.",
-                    "required": True,
-                    "selector": {
-                        "select": {
-                            "options": categories,
-                            "mode": "dropdown",
-                        }
-                    },
-                },
-                ATTR_USE_CURRENT_DATE: {
-                    "name": "Use current date",
-                    "description": "Use the current date in Home Assistant's local timezone. When enabled, Date is ignored.",
-                    "required": True,
-                    "default": True,
-                    "selector": {"boolean": {}},
-                },
-                ATTR_DATE: {
-                    "name": "Date",
-                    "description": "Date picker value to use only when Use current date is off.",
-                    "required": True,
-                    "default": _current_local_date().isoformat(),
-                    "selector": {"date": {}},
-                },
-                ATTR_CLEARED: {
-                    "name": "Cleared",
-                    "description": "Cleared status for the new transaction.",
-                    "required": True,
-                    "default": CLEARED_DEFAULT,
-                    "selector": {
-                        "select": {
-                            "options": CLEARED_OPTIONS,
-                            "mode": "dropdown",
-                        }
-                    },
-                },
-                ATTR_AMOUNT: {
-                    "name": "Amount",
-                    "description": "Transaction amount. Positive values are expenses.",
-                    "required": True,
-                    "selector": {"number": {"mode": "box", "step": 0.01}},
-                },
-                ATTR_FUND: {
-                    "name": "Fund",
-                    "description": "Fund the category from Ready to Assign after creating the transaction.",
-                    "required": True,
-                    "default": True,
-                    "selector": {"boolean": {}},
-                },
-                "sync": {
-                    "name": "Sync",
-                    "description": "Sync the SQLite export before creating the transaction.",
-                    "required": True,
-                    "default": True,
-                    "selector": {"boolean": {}},
-                },
-                "quiet": {
-                    "name": "Quiet",
-                    "description": "Suppress output from the underlying libraries.",
-                    "required": True,
-                    "default": False,
-                    "selector": {"boolean": {}},
+            ATTR_PLAN_NAME: {
+                **fields[ATTR_PLAN_NAME],
+                "selector": {"select": {"options": plans, "mode": "dropdown"}},
+                **(
+                    {"default": default_plan_name}
+                    if isinstance(default_plan_name, str)
+                    else {}
+                ),
+            },
+            ATTR_ACCOUNT_NAME: {
+                **fields[ATTR_ACCOUNT_NAME],
+                "selector": {"select": {"options": accounts, "mode": "dropdown"}},
+            },
+            ATTR_PAYEE_NAME: {
+                **fields[ATTR_PAYEE_NAME],
+                "selector": {
+                    "select": {
+                        "options": payees,
+                        "custom_value": True,
+                        "mode": "dropdown",
+                    }
                 },
             },
-        },
+            ATTR_CATEGORY_NAME: {
+                **fields[ATTR_CATEGORY_NAME],
+                "selector": {"select": {"options": categories, "mode": "dropdown"}},
+            },
+            ATTR_DATE: {
+                **fields[ATTR_DATE],
+                "default": _current_local_date().isoformat(),
+            },
+        }
+    )
+
+    service_helper.async_set_service_schema(
+        hass, DOMAIN, SERVICE_ADD_TRANSACTION, description
     )
 
 
