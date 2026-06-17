@@ -24,6 +24,7 @@ ATTR_USE_CURRENT_DATE: Final = "use_current_date"
 ATTR_DATE: Final = "date"
 ATTR_CLEARED: Final = "cleared"
 ATTR_AMOUNT: Final = "amount"
+ATTR_FUND: Final = "fund"
 
 CLEARED_DEFAULT: Final = TransactionClearedStatus.UNCLEARED.name.lower()
 CLEARED_OPTIONS: Final = [status.name.lower() for status in TransactionClearedStatus]
