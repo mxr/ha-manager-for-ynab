@@ -449,6 +449,13 @@ def _set_add_transaction_service_schema(
                     "required": True,
                     "selector": {"number": {"mode": "box", "step": 0.01}},
                 },
+                ATTR_FUND: {
+                    "name": "Fund",
+                    "description": "Fund the category from Ready to Assign after creating the transaction.",
+                    "required": True,
+                    "default": True,
+                    "selector": {"boolean": {}},
+                },
                 "sync": {
                     "name": "Sync",
                     "description": "Sync the SQLite export before creating the transaction.",

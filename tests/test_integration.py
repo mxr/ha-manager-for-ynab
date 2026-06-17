@@ -910,6 +910,7 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     )
 
     assert description is not None
+    assert description["fields"].keys() == ADD_TRANSACTION_SCHEMA.schema.keys()
     assert "default" not in description["fields"]["plan_name"]
     assert (
         "My Budget"
