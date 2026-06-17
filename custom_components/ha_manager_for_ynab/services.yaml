@@ -123,6 +123,13 @@ add_transaction:
         number:
           mode: box
           step: 0.01
+    fund:
+      required: true
+      description: Fund the category from Ready to Assign after creating the transaction.
+      default: true
+      example: true
+      selector:
+        boolean:
     sync:
       required: true
       example: true

@@ -27,6 +27,7 @@ from .const import ATTR_AMOUNT
 from .const import ATTR_CATEGORY_NAME
 from .const import ATTR_CLEARED
 from .const import ATTR_DATE
+from .const import ATTR_FUND
 from .const import ATTR_PAYEE_NAME
 from .const import ATTR_PLAN_NAME
 from .const import ATTR_SQL
@@ -96,6 +97,7 @@ ADD_TRANSACTION_SCHEMA = vol.Schema(
         ): vol.Coerce(datetime.date.fromisoformat),
         vol.Required(ATTR_CLEARED, default=CLEARED_DEFAULT): vol.In(CLEARED_OPTIONS),
         vol.Required(ATTR_AMOUNT): vol.Coerce(lambda value: Decimal(str(value))),
+        vol.Required(ATTR_FUND, default=True): cv.boolean,
         vol.Required("sync", default=True): cv.boolean,
         vol.Required("quiet", default=False): cv.boolean,
     }
@@ -277,6 +279,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 else call.data[ATTR_DATE],
                 cleared=call.data[ATTR_CLEARED],
                 amount=call.data[ATTR_AMOUNT],
+                fund=call.data[ATTR_FUND],
                 sync=call.data["sync"],
                 quiet=call.data["quiet"],
             )

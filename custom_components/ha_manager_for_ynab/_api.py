@@ -78,6 +78,7 @@ async def run_add_transaction(
     date: datetime.date,
     cleared: str,
     amount: Decimal,
+    fund: bool,
     sync: bool,
     quiet: bool,
 ) -> None:
@@ -100,6 +101,7 @@ async def run_add_transaction(
         resolved=resolved,
         token=token,
         db=db_path,
+        fund=fund,
         for_real=True,
         quiet=quiet,
     )
