@@ -934,7 +934,7 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
         not in description["fields"]["category_name"]["selector"]["select"]
     )
     assert description["fields"]["use_current_date"]["default"] is True
-    assert description["fields"]["use_current_date"]["selector"] == {"boolean": {}}
+    assert description["fields"]["use_current_date"]["selector"] == {"boolean": None}
     assert description["fields"]["date"]["default"] == "2026-05-06"
     assert entry.state is ConfigEntryState.LOADED
     _current_local_date.assert_called_once_with()
