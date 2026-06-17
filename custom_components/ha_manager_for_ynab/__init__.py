@@ -61,7 +61,14 @@ SERVICES_YAML_PATH = Path(__file__).parent / "services.yaml"
 
 @functools.lru_cache
 def _add_transaction_service_description() -> dict[str, Any]:
-    """Return the static add_transaction service description from services.yaml."""
+    """Return the static add_transaction service description from services.yaml.
+
+    Cached (no arguments, so this is a single cached value) because the
+    caller is a @callback that runs on the event loop and fires on every
+    setup, sqlite_export, and add_transaction call; without caching it would
+    do a blocking file read and YAML parse on the loop every time instead of
+    once per process.
+    """
     services = load_yaml_dict(SERVICES_YAML_PATH)
     return services[SERVICE_ADD_TRANSACTION]
 
@@ -386,6 +393,11 @@ def _set_add_transaction_service_schema(
     description = copy.deepcopy(_add_transaction_service_description())
     fields = description["fields"]
 
+    # These 4 fields use a text selector in services.yaml so the form stays
+    # usable if this dynamic update hasn't run yet (e.g. on first load before
+    # the SQLite export syncs). Swap each one to a select selector with the
+    # live options instead of mutating selector.select.options in place,
+    # since there's no select selector to mutate until we set one.
     fields.update(
         {
             ATTR_PLAN_NAME: {
