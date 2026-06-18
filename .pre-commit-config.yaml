@@ -40,7 +40,7 @@ repos:
     - asyncio-for-ynab~=1.84.0
     - coverage
     - homeassistant-stubs
-    - manager-for-ynab~=1.8.6
+    - manager-for-ynab~=1.9.0
     - pytest
     - pytest-asyncio
     - pytest-homeassistant-custom-component
@@ -54,7 +54,7 @@ repos:
     - asyncio-for-ynab~=1.84.0
     - coverage
     - homeassistant-stubs
-    - manager-for-ynab~=1.8.6
+    - manager-for-ynab~=1.9.0
     - pytest
     - pytest-asyncio
     - pytest-homeassistant-custom-component
