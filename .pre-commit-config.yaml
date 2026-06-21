@@ -44,7 +44,7 @@ repos:
     - pytest
     - pytest-asyncio
     - pytest-homeassistant-custom-component
-    - sqlite-export-for-ynab~=2.9.0
+    - sqlite-export-for-ynab~=2.9.3
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # frozen: v2.1.0
   hooks:
@@ -58,7 +58,7 @@ repos:
     - pytest
     - pytest-asyncio
     - pytest-homeassistant-custom-component
-    - sqlite-export-for-ynab~=2.9.0
+    - sqlite-export-for-ynab~=2.9.3
 - repo: https://github.com/mxr/sync-typing-deps
   rev: 15d110e7034a52d6a141f23e436e31156d4f9959  # frozen: v0.5.2
   hooks:
