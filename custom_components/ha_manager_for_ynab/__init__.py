@@ -182,6 +182,9 @@ type ManagerForYnabConfigEntry = ConfigEntry[RuntimeData]
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Manager for YNAB integration."""
     hass.data.setdefault(DOMAIN, {})
+    # Warm the lru_cache off the event loop so later @callback paths (which
+    # run on the loop) hit the cache instead of doing a blocking file read.
+    await hass.async_add_executor_job(_add_transaction_service_description)
     await _async_register_services(hass)
     return True
 
