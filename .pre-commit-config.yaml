@@ -37,7 +37,7 @@ repos:
   - id: ty
     additional_dependencies:
     - aiosqlite
-    - asyncio-for-ynab~=1.85.0
+    - asyncio-for-ynab~=1.86.0
     - coverage
     - homeassistant-stubs
     - manager-for-ynab~=1.9.1
@@ -51,7 +51,7 @@ repos:
   - id: mypy
     additional_dependencies:
     - aiosqlite
-    - asyncio-for-ynab~=1.85.0
+    - asyncio-for-ynab~=1.86.0
     - coverage
     - homeassistant-stubs
     - manager-for-ynab~=1.9.1
