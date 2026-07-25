@@ -21,7 +21,7 @@ repos:
   - id: pretty-format-yaml
     args: [--autofix]
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: c59bba8fb259db0fec2bbb77ad8ba51ea7341b56  # frozen: v0.15.20
+  rev: 2700fd5671c633760d912769c041bfcde2b9a01b  # frozen: v0.15.22
   hooks:
   - id: ruff-check
     args: [--fix]
@@ -32,11 +32,11 @@ repos:
   - id: sqlfluff-fix
     args: [--dialect, sqlite]
 - repo: https://github.com/mxr/mirrors-ty
-  rev: 009c8adeffbab5aa73005612dd5a7fd9b825eee5  # frozen: v0.0.55
+  rev: febed8a7b2665e80a9d3855c59ac716a6284d628  # frozen: v0.0.61
   hooks:
   - id: ty
     additional_dependencies:
-    - aiosqlite~=0.21.0
+    - aiosqlite
     - asyncio-for-ynab~=1.86.0
     - coverage
     - homeassistant-stubs
@@ -46,11 +46,11 @@ repos:
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab~=2.9.5
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: d2823d321df3af8f878f7ee3414dc94d037145b9  # frozen: v2.1.0
+  rev: 41e691678310dfd3833f7ab4e180ddb014310356  # frozen: v2.3.0
   hooks:
   - id: mypy
     additional_dependencies:
-    - aiosqlite~=0.21.0
+    - aiosqlite
     - asyncio-for-ynab~=1.86.0
     - coverage
     - homeassistant-stubs
@@ -60,11 +60,17 @@ repos:
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab~=2.9.5
 - repo: https://github.com/mxr/sync-typing-deps
-  rev: 15d110e7034a52d6a141f23e436e31156d4f9959  # frozen: v0.5.2
+  rev: c2ec0c01a31703615c17e3fe11d1fe28c003f1d8  # frozen: v0.5.3
   hooks:
   - id: sync-typing-deps
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
-  rev: e3eebf65325ccc992422292cb7a4baee967cf815  # frozen: v1.26.1
+  rev: 64a97fb7fa63188393d3215c6e312f5f9c6d0f78  # frozen: v1.27.0
   hooks:
   - id: zizmor
     args: [--no-progress, --fix]
+- repo: https://github.com/rhysd/actionlint
+  rev: 914e7df21a07ef503a81201c76d2b11c789d3fca  # frozen: v1.7.12
+  hooks:
+  - id: actionlint
+    additional_dependencies:
+    - github.com/wasilibs/go-shellcheck/cmd/shellcheck@latest
