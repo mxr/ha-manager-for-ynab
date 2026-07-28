@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import datetime
 import functools
+import sqlite3
 from dataclasses import dataclass
 from dataclasses import field
 from decimal import Decimal
@@ -369,7 +370,7 @@ async def _update_add_transaction_service_schema(
     """Update add-transaction service dropdowns from the current SQLite export."""
     try:
         options = await _api.get_add_transaction_options(Path(runtime_data.db_path))
-    except Exception:
+    except sqlite3.Error, OSError:
         LOGGER.debug("Could not load add_transaction service choices", exc_info=True)
         return
 
