@@ -1,7 +1,5 @@
 """Sensor platform for Manager for YNAB."""
 
-from __future__ import annotations
-
 from contextlib import suppress
 from typing import TYPE_CHECKING
 from typing import override

@@ -1,7 +1,5 @@
 """The Manager for YNAB integration."""
 
-from __future__ import annotations
-
 import copy
 import datetime
 import functools
