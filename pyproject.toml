@@ -46,7 +46,6 @@ extend-select = [
 
 [tool.ruff.lint.isort]
 force-single-line = true
-required-imports = ["from __future__ import annotations"]
 
 [tool.sqlfluff.layout.type.comma]
 line_position = "leading"

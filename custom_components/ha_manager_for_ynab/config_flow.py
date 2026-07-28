@@ -1,7 +1,5 @@
 """Config flow for Manager for YNAB."""
 
-from __future__ import annotations
-
 from typing import Any
 from typing import override
 
