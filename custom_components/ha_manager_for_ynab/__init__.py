@@ -451,7 +451,7 @@ def _as_string_list(value: object) -> list[str]:
 @callback
 def _get_runtime_data(hass: HomeAssistant) -> RuntimeData:
     """Return the configured runtime data for the single integration entry."""
-    runtime_data_by_entry: dict[str, RuntimeData] = hass.data.get(DOMAIN, {})
+    runtime_data_by_entry = cast("dict[str, RuntimeData]", hass.data.get(DOMAIN, {}))
     if len(runtime_data_by_entry) != 1:
         raise HomeAssistantError("Manager for YNAB is not configured")
 
