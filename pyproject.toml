@@ -48,6 +48,11 @@ extend-select = [
 [tool.ruff.lint.isort]
 force-single-line = true
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "S101",  # asserts are fine in tests
+]
+
 [tool.sqlfluff.layout.type.comma]
 line_position = "leading"
 spacing_before = "touch"
