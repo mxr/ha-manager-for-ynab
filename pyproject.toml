@@ -49,9 +49,8 @@ extend-select = [
 force-single-line = true
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = [
-  "S101",  # asserts are fine in tests
-]
+# asserts are fine in tests
+"tests/**" = ["S101"]
 
 [tool.sqlfluff.layout.type.comma]
 line_position = "leading"
