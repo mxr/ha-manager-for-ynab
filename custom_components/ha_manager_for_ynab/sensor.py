@@ -105,9 +105,9 @@ class ManagerForYnabCountSensor(RestoreEntity, SensorEntity):
             self._runtime_data.async_add_listener(self.async_write_ha_state)
         )
 
-    @override
     @property
-    def native_value(self) -> int | None:
+    @override
+    def native_value(self) -> int | None:  # pyright: ignore[reportIncompatibleVariableOverride]
         """Return the latest count."""
         return self._native_value_getter(self._runtime_data)
 
