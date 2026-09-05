@@ -269,7 +269,7 @@ async def _resolve_add_transaction(
             id=str(account["id"]),
             name=str(account["name"]),
             type=str(account["type"]),
-            balance=int(account["cleared_balance"]),
+            cleared_balance=int(account["cleared_balance"]),
         ),
         payee=ResolvedPayee(id=str(payee["id"]), name=str(payee["name"])),
         category=category,
