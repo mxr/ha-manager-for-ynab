@@ -996,7 +996,9 @@ async def test_config_entry_setup_registers_entity_and_device(
     auto_approve_cleared_entity_entry = er.async_get(hass).async_get(
         auto_approve_cleared_entity_id
     )
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        identifier=(DOMAIN, entry.entry_id), config_entry_id=entry.entry_id
+    )
 
     assert state is not None
     assert state.state == "unknown"
