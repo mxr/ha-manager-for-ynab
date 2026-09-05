@@ -4,6 +4,7 @@ CREATE TABLE accounts (
     , plan_id TEXT
     , name TEXT
     , type TEXT
+    , cleared_balance INT
     , deleted BOOLEAN
     , closed BOOLEAN
 )
