@@ -1,7 +1,7 @@
 default_language_version:
   python: python3.14
 ci:
-  skip: [mypy, ty]  # venv is too big; runs with gihub action instead
+  skip: [mypy, pyright, ty]  # venv is too big; runs with gihub action instead
 
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -17,6 +17,20 @@ repos:
     args: [--autofix, --trailing-commas]
   - id: pretty-format-yaml
     args: [--autofix]
+- repo: https://github.com/mxr/mirrors-pyright
+  rev: 789d36e40263da0e4d83395ed125b03a3a0e2c5f  # frozen: v1.1.412
+  hooks:
+  - id: pyright
+    additional_dependencies:
+    - aiosqlite
+    - asyncio-for-ynab~=1.86.0
+    - coverage
+    - homeassistant-stubs
+    - manager-for-ynab~=1.9.3
+    - pytest
+    - pytest-asyncio
+    - pytest-homeassistant-custom-component
+    - sqlite-export-for-ynab~=2.9.6
 - repo: https://github.com/mxr/mirrors-ty
   rev: 429804df3fe7b725a9a36f196e9a5390c9f12cd3  # frozen: v0.0.76
   hooks:
@@ -32,7 +46,7 @@ repos:
     - pytest-homeassistant-custom-component
     - sqlite-export-for-ynab~=2.9.6
 - repo: https://github.com/mxr/sync-typing-deps
-  rev: 827c0d0f5b5dda0644170665034006604f9eb10b  # frozen: v0.6.0
+  rev: 896a112838d434d8e607d4d636323c5914ab933f  # frozen: v0.7.0
   hooks:
   - id: sync-typing-deps
 - repo: https://github.com/pre-commit/mirrors-mypy
