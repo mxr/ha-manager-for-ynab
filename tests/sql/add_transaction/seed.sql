@@ -4,6 +4,7 @@ CREATE TABLE accounts (
     , plan_id TEXT
     , name TEXT
     , type TEXT
+    , cleared_balance INT
     , deleted BOOLEAN
     , closed BOOLEAN
 )
@@ -32,6 +33,7 @@ INSERT INTO accounts VALUES (
     , '11111111-1111-1111-1111-111111111111'
     , 'Checking'
     , 'checking'
+    , 1000
     , 0
     , 0
 )
@@ -57,11 +59,11 @@ INSERT INTO categories VALUES (
 INSERT INTO plans VALUES ('plan-a', 'Budget A');
 INSERT INTO plans VALUES ('plan-b', 'Budget B');
 INSERT INTO accounts VALUES (
-    'account-a', 'plan-a', 'Checking A', 'checking', 0, 0
+    'account-a', 'plan-a', 'Checking A', 'checking', 1000, 0, 0
 )
 ;
 INSERT INTO accounts VALUES (
-    'account-b', 'plan-b', 'Checking B', 'checking', 0, 0
+    'account-b', 'plan-b', 'Checking B', 'checking', 1000, 0, 0
 )
 ;
 INSERT INTO categories VALUES (
@@ -77,11 +79,11 @@ INSERT INTO payees VALUES ('payee-b', 'plan-b', 'Market Co', NULL, 0);
 
 INSERT INTO plans VALUES ('transfer-plan', 'Transfer Budget');
 INSERT INTO accounts VALUES (
-    'transfer-checking', 'transfer-plan', 'Checking', 'checking', 0, 0
+    'transfer-checking', 'transfer-plan', 'Checking', 'checking', 1000, 0, 0
 )
 ;
 INSERT INTO accounts VALUES (
-    'transfer-savings', 'transfer-plan', 'Savings', 'checking', 0, 0
+    'transfer-savings', 'transfer-plan', 'Savings', 'checking', 1000, 0, 0
 )
 ;
 INSERT INTO payees VALUES (
@@ -94,7 +96,7 @@ INSERT INTO payees VALUES ('empty-payee', 'empty-plan', 'Power Co', NULL, 0);
 
 INSERT INTO plans VALUES ('schema-plan', 'My Budget');
 INSERT INTO accounts VALUES (
-    'schema-account', 'schema-plan', 'My Account', 'checking', 0, 0
+    'schema-account', 'schema-plan', 'My Account', 'checking', 1000, 0, 0
 )
 ;
 INSERT INTO categories VALUES (
@@ -102,7 +104,13 @@ INSERT INTO categories VALUES (
 )
 ;
 INSERT INTO accounts VALUES (
-    'schema-duplicate-account', 'schema-plan', 'Checking B', 'checking', 0, 0
+    'schema-duplicate-account'
+    , 'schema-plan'
+    , 'Checking B'
+    , 'checking'
+    , 1000
+    , 0
+    , 0
 )
 ;
 INSERT INTO categories VALUES (

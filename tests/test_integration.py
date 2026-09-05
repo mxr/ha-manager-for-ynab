@@ -543,7 +543,7 @@ async def test_api_run_add_transaction(
     assert add_transaction_and_move_funds.call_args.kwargs["db"] == db_path
     assert add_transaction_and_move_funds.call_args.kwargs["for_real"] is True
     assert add_transaction_and_move_funds.call_args.kwargs["quiet"] is True
-    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"][0]
     assert resolved.plan.id == plan_id
     assert resolved.plan.name == "Budget"
     assert resolved.account.id == account_id
@@ -618,7 +618,7 @@ async def test_api_run_add_transaction_ignores_transfer_category(
     )
 
     add_transaction_and_move_funds.assert_awaited_once()
-    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"][0]
     assert resolved.category is None
 
 
@@ -717,7 +717,7 @@ async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
     )
 
     add_transaction_and_move_funds.assert_awaited_once()
-    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"][0]
     assert resolved.plan.name == "Single Budget"
 
 
@@ -771,7 +771,7 @@ async def test_api_run_add_transaction_explicit_plan_no_sync(
     )
 
     add_transaction_and_move_funds.assert_awaited_once()
-    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"][0]
     assert resolved.plan.name == "Budget"
     assert resolved.category is None
 

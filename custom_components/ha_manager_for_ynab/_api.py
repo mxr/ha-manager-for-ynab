@@ -96,7 +96,7 @@ async def run_add_transaction(
         amount=amount,
     )
     result = await add_transaction_and_move_funds(
-        resolved=resolved,
+        resolved=[resolved],
         token=token,
         db=db_path,
         fund=fund,
@@ -227,7 +227,7 @@ async def _resolve_add_transaction(
         account = await _fetch_one_row(
             con,
             """
-            SELECT id, name, type
+            SELECT id, name, type, cleared_balance
             FROM accounts
             WHERE plan_id = ? AND name = ? AND NOT deleted AND NOT closed
             """,
@@ -266,7 +266,10 @@ async def _resolve_add_transaction(
     return ResolvedTransaction(
         plan=plan,
         account=ResolvedAccount(
-            id=str(account["id"]), name=str(account["name"]), type=str(account["type"])
+            id=str(account["id"]),
+            name=str(account["name"]),
+            type=str(account["type"]),
+            balance=int(account["cleared_balance"]),
         ),
         payee=ResolvedPayee(id=str(payee["id"]), name=str(payee["name"])),
         category=category,

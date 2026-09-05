@@ -4,6 +4,7 @@ CREATE TABLE accounts (
     , plan_id TEXT
     , name TEXT
     , type TEXT
+    , cleared_balance INT
     , deleted BOOLEAN
     , closed BOOLEAN
 )
@@ -28,7 +29,7 @@ CREATE TABLE payees (
 
 INSERT INTO plans VALUES ('single-plan', 'Single Budget');
 INSERT INTO accounts VALUES (
-    'single-account', 'single-plan', 'Checking', 'checking', 0, 0
+    'single-account', 'single-plan', 'Checking', 'checking', 1000, 0, 0
 )
 ;
 INSERT INTO payees VALUES ('single-payee', 'single-plan', 'Power Co', NULL, 0);
