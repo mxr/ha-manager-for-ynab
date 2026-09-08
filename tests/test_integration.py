@@ -395,10 +395,7 @@ async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
     await _api.run_sqlite_export(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        full_refresh=True,
-        quiet=False,
+        "token", Path("/tmp/db.sqlite3"), full_refresh=True, quiet=False
     )
 
     sqlite_export_sync.assert_awaited_once_with(
@@ -1116,18 +1113,10 @@ async def test_register_services_success_and_idempotence(
     assert auto_approve_cleared_state is not None
     assert auto_approve_cleared_state.state == "2"
     run_auto_approve.assert_called_once_with(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        for_real=True,
-        sync=True,
-        quiet=True,
+        "token", Path("/tmp/db.sqlite3"), for_real=True, sync=True, quiet=True
     )
     run_pending_income.assert_called_once_with(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        for_real=True,
-        sync=True,
-        quiet=True,
+        "token", Path("/tmp/db.sqlite3"), for_real=True, sync=True, quiet=True
     )
     run_sqlite_export.assert_has_calls(
         [
@@ -1135,10 +1124,7 @@ async def test_register_services_success_and_idempotence(
             call("token", Path("/tmp/db.sqlite3"), full_refresh=False, quiet=True),
         ]
     )
-    run_sql_query.assert_awaited_once_with(
-        Path("/tmp/db.sqlite3"),
-        "select 1",
-    )
+    run_sql_query.assert_awaited_once_with(Path("/tmp/db.sqlite3"), "select 1")
     run_add_transaction.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
