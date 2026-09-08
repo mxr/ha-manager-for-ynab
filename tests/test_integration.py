@@ -3,7 +3,6 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import cast
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -64,7 +63,6 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import Entity
-    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 
 def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
@@ -108,12 +106,11 @@ def test_runtime_data_listener_unsubscribe_is_idempotent() -> None:
 
 def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
-    seen: list[int | None] = []
+    seen = []
 
-    def listener() -> None:
-        seen.append(runtime_data.pending_income_updated_count)
-
-    runtime_data.async_add_listener(listener)
+    runtime_data.async_add_listener(
+        lambda: seen.append(runtime_data.pending_income_updated_count)
+    )
     runtime_data.async_set_pending_income_updated_count(3)
 
     assert runtime_data.pending_income_updated_count == 3
@@ -124,15 +121,14 @@ def test_runtime_data_notifies_listeners_on_auto_approve_update() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     seen: list[tuple[int | None, int | None]] = []
 
-    def listener() -> None:
-        seen.append(
+    runtime_data.async_add_listener(
+        lambda: seen.append(
             (
                 runtime_data.auto_approve_approved_count,
                 runtime_data.auto_approve_cleared_count,
             )
         )
-
-    runtime_data.async_add_listener(listener)
+    )
     runtime_data.async_set_auto_approve_counts(
         AutoApproveResult(transactions=[], updated_count=3, cleared=2)
     )
@@ -164,15 +160,14 @@ def test_runtime_data_notifies_listeners_on_restored_auto_approve_count(
     runtime_data = RuntimeData(token="token", db_path="")
     seen: list[tuple[int | None, int | None]] = []
 
-    def listener() -> None:
-        seen.append(
+    runtime_data.async_add_listener(
+        lambda: seen.append(
             (
                 runtime_data.auto_approve_approved_count,
                 runtime_data.auto_approve_cleared_count,
             )
         )
-
-    runtime_data.async_add_listener(listener)
+    )
     setter(runtime_data)
 
     assert seen == expected_seen
@@ -287,19 +282,8 @@ async def test_sensor_async_setup_entry_adds_entity(hass: HomeAssistant) -> None
     entry = MockConfigEntry(domain=DOMAIN, entry_id="entry-1")
     entry.runtime_data = RuntimeData(token="token", db_path="")
 
-    def add_entities(
-        new_entities: list[Entity],
-        update_before_add: bool = False,
-        *,
-        config_subentry_id: str | None = None,
-    ) -> None:
-        del update_before_add, config_subentry_id
-        added.extend(new_entities)
-
     await sensor_async_setup_entry(
-        hass,
-        entry,
-        cast("AddConfigEntryEntitiesCallback", add_entities),
+        hass, entry, lambda new_entities, *_, **__: added.extend(new_entities)
     )
 
     assert len(added) == 3
@@ -356,9 +340,7 @@ def test_user_schema_uses_default_db_path(sqlite_default_db_path: Mock) -> None:
     "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
     return_value=Path("/tmp/default.sqlite3"),
 )
-def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None:
-    del sqlite_default_db_path
-
+def test_user_schema_rejects_empty_db_path(_: Mock) -> None:
     with pytest.raises(vol.Invalid):
         _user_schema()({"token": "token", "db_path": ""})
 
@@ -413,10 +395,7 @@ async def test_api_run_auto_approve(auto_approve: AsyncMock) -> None:
 @pytest.mark.asyncio
 async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) -> None:
     await _api.run_sqlite_export(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        full_refresh=True,
-        quiet=False,
+        "token", Path("/tmp/db.sqlite3"), full_refresh=True, quiet=False
     )
 
     sqlite_export_sync.assert_awaited_once_with(
@@ -1134,18 +1113,10 @@ async def test_register_services_success_and_idempotence(
     assert auto_approve_cleared_state is not None
     assert auto_approve_cleared_state.state == "2"
     run_auto_approve.assert_called_once_with(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        for_real=True,
-        sync=True,
-        quiet=True,
+        "token", Path("/tmp/db.sqlite3"), for_real=True, sync=True, quiet=True
     )
     run_pending_income.assert_called_once_with(
-        "token",
-        Path("/tmp/db.sqlite3"),
-        for_real=True,
-        sync=True,
-        quiet=True,
+        "token", Path("/tmp/db.sqlite3"), for_real=True, sync=True, quiet=True
     )
     run_sqlite_export.assert_has_calls(
         [
@@ -1153,10 +1124,7 @@ async def test_register_services_success_and_idempotence(
             call("token", Path("/tmp/db.sqlite3"), full_refresh=False, quiet=True),
         ]
     )
-    run_sql_query.assert_awaited_once_with(
-        Path("/tmp/db.sqlite3"),
-        "select 1",
-    )
+    run_sql_query.assert_awaited_once_with(Path("/tmp/db.sqlite3"), "select 1")
     run_add_transaction.assert_called_once_with(
         "token",
         Path("/tmp/db.sqlite3"),
@@ -1379,13 +1347,6 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     match: str,
     hass: HomeAssistant,
 ) -> None:
-    del (
-        run_auto_approve,
-        run_pending_income,
-        run_sqlite_export,
-        run_add_transaction,
-        run_sql_query,
-    )
     await setup_integration(hass)
 
     with pytest.raises(HomeAssistantError, match=match):
