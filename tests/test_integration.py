@@ -343,9 +343,7 @@ def test_user_schema_uses_default_db_path(sqlite_default_db_path: Mock) -> None:
     "custom_components.ha_manager_for_ynab.config_flow.sqlite_default_db_path",
     return_value=Path("/tmp/default.sqlite3"),
 )
-def test_user_schema_rejects_empty_db_path(sqlite_default_db_path: Mock) -> None:
-    del sqlite_default_db_path
-
+def test_user_schema_rejects_empty_db_path(_: Mock) -> None:
     with pytest.raises(vol.Invalid):
         _user_schema()({"token": "token", "db_path": ""})
 
@@ -1366,13 +1364,6 @@ async def test_register_services_error_paths_raise_home_assistant_error(
     match: str,
     hass: HomeAssistant,
 ) -> None:
-    del (
-        run_auto_approve,
-        run_pending_income,
-        run_sqlite_export,
-        run_add_transaction,
-        run_sql_query,
-    )
     await setup_integration(hass)
 
     with pytest.raises(HomeAssistantError, match=match):
