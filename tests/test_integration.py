@@ -3,7 +3,6 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import cast
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -64,7 +63,6 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import Entity
-    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 
 def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
@@ -282,24 +280,13 @@ async def test_sensor_async_added_to_hass_preserves_runtime_state(
 
 
 @pytest.mark.asyncio
-async def test_sensor_async_setup_entry_adds_entity() -> None:
+async def test_sensor_async_setup_entry_adds_entity(hass: HomeAssistant) -> None:
     added: list[Entity] = []
     entry = MockConfigEntry(domain=DOMAIN, entry_id="entry-1")
     entry.runtime_data = RuntimeData(token="token", db_path="")
 
-    def add_entities(
-        new_entities: list[Entity],
-        update_before_add: bool = False,
-        *,
-        config_subentry_id: str | None = None,
-    ) -> None:
-        del update_before_add, config_subentry_id
-        added.extend(new_entities)
-
     await sensor_async_setup_entry(
-        cast("HomeAssistant", None),
-        entry,
-        cast("AddConfigEntryEntitiesCallback", add_entities),
+        hass, entry, lambda new_entities, *_, **__: added.extend(new_entities)
     )
 
     assert len(added) == 3
