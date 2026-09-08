@@ -282,7 +282,7 @@ async def test_sensor_async_added_to_hass_preserves_runtime_state(
 
 
 @pytest.mark.asyncio
-async def test_sensor_async_setup_entry_adds_entity() -> None:
+async def test_sensor_async_setup_entry_adds_entity(hass: HomeAssistant) -> None:
     added: list[Entity] = []
     entry = MockConfigEntry(domain=DOMAIN, entry_id="entry-1")
     entry.runtime_data = RuntimeData(token="token", db_path="")
@@ -297,7 +297,7 @@ async def test_sensor_async_setup_entry_adds_entity() -> None:
         added.extend(new_entities)
 
     await sensor_async_setup_entry(
-        cast("HomeAssistant", None),
+        hass,
         entry,
         cast("AddConfigEntryEntitiesCallback", add_entities),
     )
