@@ -108,10 +108,9 @@ def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     seen: list[int | None] = []
 
-    def listener() -> None:
-        seen.append(runtime_data.pending_income_updated_count)
-
-    runtime_data.async_add_listener(listener)
+    runtime_data.async_add_listener(
+        lambda: seen.append(runtime_data.pending_income_updated_count)
+    )
     runtime_data.async_set_pending_income_updated_count(3)
 
     assert runtime_data.pending_income_updated_count == 3
@@ -122,15 +121,14 @@ def test_runtime_data_notifies_listeners_on_auto_approve_update() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     seen: list[tuple[int | None, int | None]] = []
 
-    def listener() -> None:
-        seen.append(
+    runtime_data.async_add_listener(
+        lambda: seen.append(
             (
                 runtime_data.auto_approve_approved_count,
                 runtime_data.auto_approve_cleared_count,
             )
         )
-
-    runtime_data.async_add_listener(listener)
+    )
     runtime_data.async_set_auto_approve_counts(
         AutoApproveResult(transactions=[], updated_count=3, cleared=2)
     )
@@ -162,15 +160,14 @@ def test_runtime_data_notifies_listeners_on_restored_auto_approve_count(
     runtime_data = RuntimeData(token="token", db_path="")
     seen: list[tuple[int | None, int | None]] = []
 
-    def listener() -> None:
-        seen.append(
+    runtime_data.async_add_listener(
+        lambda: seen.append(
             (
                 runtime_data.auto_approve_approved_count,
                 runtime_data.auto_approve_cleared_count,
             )
         )
-
-    runtime_data.async_add_listener(listener)
+    )
     setter(runtime_data)
 
     assert seen == expected_seen
