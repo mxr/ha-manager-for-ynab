@@ -106,7 +106,7 @@ def test_runtime_data_listener_unsubscribe_is_idempotent() -> None:
 
 def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
-    seen: list[int | None] = []
+    seen = []
 
     runtime_data.async_add_listener(
         lambda: seen.append(runtime_data.pending_income_updated_count)
