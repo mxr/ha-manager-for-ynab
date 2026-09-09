@@ -1,6 +1,7 @@
 # Manager for YNAB
 
-Manager for YNAB is a Home Assistant custom integration for running `manager-for-ynab` and `sqlite-export-for-ynab` from Home Assistant automations.
+Manager for YNAB is a Home Assistant custom integration for running `manager-for-ynab` and `sqlite-export-for-ynab` from
+Home Assistant automations.
 
 ## Features
 
@@ -42,7 +43,8 @@ Leave the DB path empty to use the default path from `sqlite-export-for-ynab`.
 - `sync`: default `true`
 - `quiet`: default `false`
 
-This runs `manager-for-ynab.auto_approve.auto_approve(...)` and updates the sensors to the returned `updated_count` and `cleared` counts.
+This runs `manager-for-ynab.auto_approve.auto_approve(...)` and updates the sensors to the returned `updated_count` and
+`cleared` counts.
 
 ### `pending_income`
 
@@ -71,12 +73,15 @@ This executes the SQL against the configured SQLite DB path and returns rows as 
 - `plan_name`: optional when the SQLite export has exactly one plan
 - `account_name`: required
 - `payee_name`: required
-- `category_name`: shown by default, formatted as `Category Group - Category Name`; ignored when the payee is another account, which makes the transaction a transfer
-- `use_current_date`: default `true`; when enabled, the transaction uses the current date in Home Assistant's local timezone and ignores `date`
+- `category_name`: shown by default, formatted as `Category Group - Category Name`; ignored when the payee is another
+  account, which makes the transaction a transfer
+- `use_current_date`: default `true`; when enabled, the transaction uses the current date in Home Assistant's local
+  timezone and ignores `date`
 - `date`: required, default today; picker value used only when `use_current_date` is `false`
 - `cleared`: default `uncleared`
 - `amount`: required, positive values are expenses
 - `sync`: default `true`
 - `quiet`: default `false`
 
-This creates a transaction with `manager-for-ynab`'s add-transaction fund-moving helper. Dropdown values still come from the configured SQLite export and refresh automatically after sync-capable actions.
+This creates a transaction with `manager-for-ynab`'s add-transaction fund-moving helper. Dropdown values still come from
+the configured SQLite export and refresh automatically after sync-capable actions.
