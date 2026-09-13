@@ -1,8 +1,10 @@
 """Thin wrappers around external YNAB libraries."""
 
+import asyncio
 from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Any
+from typing import cast
 
 import aiosqlite
 from asyncio_for_ynab import TransactionClearedStatus
@@ -113,73 +115,89 @@ async def get_add_transaction_options(db_path: Path) -> dict[str, Any]:
     async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as con:
         con.row_factory = aiosqlite.Row
 
-        plans = await _fetch_column(
-            con,
-            "SELECT name FROM plans ORDER BY LOWER(name)",
+        results = await asyncio.gather(
+            _fetch_column(
+                con,
+                "SELECT name FROM plans ORDER BY LOWER(name)",
+            ),
+            _fetch_grouped_column(
+                con,
+                """
+                SELECT p.name AS plan_name, c.category_group_name || ' - ' || c.name AS name
+                FROM categories AS c
+                INNER JOIN plans AS p ON p.id = c.plan_id
+                WHERE NOT c.deleted AND NOT c.hidden AND c.name != 'Uncategorized'
+                GROUP BY p.name, c.category_group_name, c.name
+                ORDER BY
+                  LOWER(p.name),
+                  CASE WHEN c.category_group_name = 'Credit Card Payments' THEN 1 ELSE 0 END,
+                  LOWER(c.category_group_name),
+                  LOWER(c.name)
+                """,
+            ),
+            _fetch_grouped_column(
+                con,
+                """
+                SELECT p.name AS plan_name, a.name
+                FROM accounts AS a
+                INNER JOIN plans AS p ON p.id = a.plan_id
+                WHERE NOT a.deleted AND NOT a.closed
+                GROUP BY p.name, a.name
+                ORDER BY LOWER(p.name), LOWER(a.name)
+                """,
+            ),
+            _fetch_grouped_column(
+                con,
+                """
+                SELECT p.name AS plan_name, payees.name
+                FROM payees
+                INNER JOIN plans AS p ON p.id = payees.plan_id
+                WHERE NOT payees.deleted
+                GROUP BY p.name, payees.name
+                ORDER BY LOWER(p.name), LOWER(payees.name)
+                """,
+            ),
+            _fetch_column(
+                con,
+                """
+                SELECT c.category_group_name || ' - ' || c.name AS name
+                FROM categories AS c
+                WHERE NOT c.deleted AND NOT c.hidden AND c.name != 'Uncategorized'
+                GROUP BY c.category_group_name, c.name
+                ORDER BY
+                  CASE WHEN c.category_group_name = 'Credit Card Payments' THEN 1 ELSE 0 END,
+                  LOWER(c.category_group_name),
+                  LOWER(c.name)
+                """,
+            ),
+            _fetch_column(
+                con,
+                """
+                SELECT a.name
+                FROM accounts AS a
+                WHERE NOT a.deleted AND NOT a.closed
+                GROUP BY a.name
+                ORDER BY LOWER(a.name)
+                """,
+            ),
+            _fetch_column(
+                con,
+                """
+                SELECT payees.name
+                FROM payees
+                WHERE NOT payees.deleted
+                GROUP BY payees.name
+                ORDER BY LOWER(payees.name)
+                """,
+            ),
         )
-        categories = await _fetch_grouped_column(
-            con,
-            """
-            SELECT p.name AS plan_name, c.category_group_name || ' - ' || c.name AS name
-            FROM categories AS c
-            INNER JOIN plans AS p ON p.id = c.plan_id
-            WHERE NOT c.deleted AND NOT c.hidden AND c.name != 'Uncategorized'
-            GROUP BY p.name, c.category_group_name, c.name
-            ORDER BY LOWER(p.name), CASE WHEN c.category_group_name = 'Credit Card Payments' THEN 1 ELSE 0 END, LOWER(c.category_group_name), LOWER(c.name)
-            """,
-        )
-        accounts = await _fetch_grouped_column(
-            con,
-            """
-            SELECT p.name AS plan_name, a.name
-            FROM accounts AS a
-            INNER JOIN plans AS p ON p.id = a.plan_id
-            WHERE NOT a.deleted AND NOT a.closed
-            GROUP BY p.name, a.name
-            ORDER BY LOWER(p.name), LOWER(a.name)
-            """,
-        )
-        payees = await _fetch_grouped_column(
-            con,
-            """
-            SELECT p.name AS plan_name, payees.name
-            FROM payees
-            INNER JOIN plans AS p ON p.id = payees.plan_id
-            WHERE NOT payees.deleted
-            GROUP BY p.name, payees.name
-            ORDER BY LOWER(p.name), LOWER(payees.name)
-            """,
-        )
-        category_options = await _fetch_column(
-            con,
-            """
-            SELECT c.category_group_name || ' - ' || c.name AS name
-            FROM categories AS c
-            WHERE NOT c.deleted AND NOT c.hidden AND c.name != 'Uncategorized'
-            GROUP BY c.category_group_name, c.name
-            ORDER BY CASE WHEN c.category_group_name = 'Credit Card Payments' THEN 1 ELSE 0 END, LOWER(c.category_group_name), LOWER(c.name)
-            """,
-        )
-        account_options = await _fetch_column(
-            con,
-            """
-            SELECT a.name
-            FROM accounts AS a
-            WHERE NOT a.deleted AND NOT a.closed
-            GROUP BY a.name
-            ORDER BY LOWER(a.name)
-            """,
-        )
-        payee_options = await _fetch_column(
-            con,
-            """
-            SELECT payees.name
-            FROM payees
-            WHERE NOT payees.deleted
-            GROUP BY payees.name
-            ORDER BY LOWER(payees.name)
-            """,
-        )
+        plans = cast("list[str]", results[0])
+        categories = cast("dict[str, list[str]]", results[1])
+        accounts = cast("dict[str, list[str]]", results[2])
+        payees = cast("dict[str, list[str]]", results[3])
+        category_options = cast("list[str]", results[4])
+        account_options = cast("list[str]", results[5])
+        payee_options = cast("list[str]", results[6])
 
     return {
         "default_plan_name": plans[0] if len(plans) == 1 else None,
@@ -224,25 +242,27 @@ async def _resolve_add_transaction(
     async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as con:
         con.row_factory = aiosqlite.Row
         plan = await _resolve_plan(con, plan_name)
-        account = await _fetch_one_row(
-            con,
-            """
-            SELECT id, name, type, cleared_balance
-            FROM accounts
-            WHERE plan_id = ? AND name = ? AND NOT deleted AND NOT closed
-            """,
-            (plan.id, account_name),
-            f"No open account named {account_name!r} found in selected plan.",
-        )
-        payee = await _fetch_one_row(
-            con,
-            """
-            SELECT id, name, transfer_account_id
-            FROM payees
-            WHERE plan_id = ? AND name = ? AND NOT deleted
-            """,
-            (plan.id, payee_name),
-            f"No payee named {payee_name!r} found in selected plan.",
+        account, payee = await asyncio.gather(
+            _fetch_one_row(
+                con,
+                """
+                SELECT id, name, type, cleared_balance
+                FROM accounts
+                WHERE plan_id = ? AND name = ? AND NOT deleted AND NOT closed
+                """,
+                (plan.id, account_name),
+                f"No open account named {account_name!r} found in selected plan.",
+            ),
+            _fetch_one_row(
+                con,
+                """
+                SELECT id, name, transfer_account_id
+                FROM payees
+                WHERE plan_id = ? AND name = ? AND NOT deleted
+                """,
+                (plan.id, payee_name),
+                f"No payee named {payee_name!r} found in selected plan.",
+            ),
         )
         category = None
         if category_group_and_name and payee["transfer_account_id"] is None:
