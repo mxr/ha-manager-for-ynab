@@ -505,7 +505,7 @@ async def test_api_run_add_transaction(
         plan_name="Budget",
         account_name="Checking",
         payee_name="Power Co",
-        category_name="Bills - Electric",
+        category_group_and_name="Bills - Electric",
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
@@ -557,7 +557,7 @@ async def test_api_run_add_transaction_raises_on_nonzero_result(
             plan_name="Budget",
             account_name="Checking",
             payee_name="Power Co",
-            category_name="Bills - Electric",
+            category_group_and_name="Bills - Electric",
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
@@ -587,7 +587,7 @@ async def test_api_run_add_transaction_ignores_transfer_category(
         plan_name="Transfer Budget",
         account_name="Checking",
         payee_name="Transfer",
-        category_name="Bills - Electric",
+        category_group_and_name="Bills - Electric",
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
@@ -602,7 +602,7 @@ async def test_api_run_add_transaction_ignores_transfer_category(
 
 
 @pytest.mark.parametrize(
-    ("seed_path", "plan_name", "account_name", "category_name", "match"),
+    ("seed_path", "plan_name", "account_name", "category_group_and_name", "match"),
     [
         pytest.param(
             ADD_TRANSACTION_SEED,
@@ -643,7 +643,7 @@ async def test_api_run_add_transaction_raises(
     seed_path: Path,
     plan_name: str | None,
     account_name: str,
-    category_name: str | None,
+    category_group_and_name: str | None,
     match: str,
     tmp_path: Path,
 ) -> None:
@@ -657,7 +657,7 @@ async def test_api_run_add_transaction_raises(
             plan_name=plan_name,
             account_name=account_name,
             payee_name="Power Co",
-            category_name=category_name,
+            category_group_and_name=category_group_and_name,
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
@@ -686,7 +686,7 @@ async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
         plan_name=None,
         account_name="Checking",
         payee_name="Power Co",
-        category_name=None,
+        category_group_and_name=None,
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
@@ -712,7 +712,7 @@ async def test_api_run_add_transaction_without_plans_raises(tmp_path: Path) -> N
             plan_name=None,
             account_name="Checking",
             payee_name="Power Co",
-            category_name=None,
+            category_group_and_name=None,
             date=datetime.date(2026, 5, 1),
             cleared="uncleared",
             amount=Decimal("12.34"),
@@ -740,7 +740,7 @@ async def test_api_run_add_transaction_explicit_plan_no_sync(
         plan_name="Budget",
         account_name="Checking",
         payee_name="Power Co",
-        category_name=None,
+        category_group_and_name=None,
         date=datetime.date(2026, 5, 1),
         cleared="cleared",
         amount=Decimal("12.34"),
@@ -903,12 +903,14 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     )
     assert (
         "My Category Group - My Category"
-        in description["fields"]["category_name"]["selector"]["select"]["options"]
+        in description["fields"]["category_group_and_name"]["selector"]["select"][
+            "options"
+        ]
     )
-    assert description["fields"]["category_name"]["required"] is True
+    assert description["fields"]["category_group_and_name"]["required"] is True
     assert (
         "custom_value"
-        not in description["fields"]["category_name"]["selector"]["select"]
+        not in description["fields"]["category_group_and_name"]["selector"]["select"]
     )
     assert description["fields"]["use_current_date"]["default"] is True
     assert description["fields"]["use_current_date"]["selector"] == {"boolean": None}
@@ -947,7 +949,12 @@ async def test_set_add_transaction_service_schema_handles_bad_options(
     assert description["fields"]["plan_name"]["default"] == "My Budget"
     assert description["fields"]["plan_name"]["selector"]["select"]["options"] == []
     assert description["fields"]["account_name"]["selector"]["select"]["options"] == []
-    assert description["fields"]["category_name"]["selector"]["select"]["options"] == []
+    assert (
+        description["fields"]["category_group_and_name"]["selector"]["select"][
+            "options"
+        ]
+        == []
+    )
     assert description["fields"]["payee_name"]["selector"]["select"]["options"] == []
 
 
@@ -1085,7 +1092,7 @@ async def test_register_services_success_and_idempotence(
             "plan_name": "Budget",
             "account_name": "Checking",
             "payee_name": "Store",
-            "category_name": "Food - Groceries",
+            "category_group_and_name": "Food - Groceries",
             "use_current_date": False,
             "date": "2026-05-01",
             "cleared": "uncleared",
@@ -1131,7 +1138,7 @@ async def test_register_services_success_and_idempotence(
         plan_name="Budget",
         account_name="Checking",
         payee_name="Store",
-        category_name="Food - Groceries",
+        category_group_and_name="Food - Groceries",
         date=datetime.date(2026, 5, 1),
         cleared="uncleared",
         amount=Decimal("12.34"),
@@ -1240,7 +1247,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
             "plan_name": "Budget",
             "account_name": "Checking",
             "payee_name": "Store",
-            "category_name": "Food - Groceries",
+            "category_group_and_name": "Food - Groceries",
             "use_current_date": True,
             "cleared": "uncleared",
             "amount": "12.34",
@@ -1256,7 +1263,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
         plan_name="Budget",
         account_name="Checking",
         payee_name="Store",
-        category_name="Food - Groceries",
+        category_group_and_name="Food - Groceries",
         date=datetime.date(2026, 5, 6),
         cleared="uncleared",
         amount=Decimal("12.34"),

@@ -72,7 +72,7 @@ async def run_add_transaction(
     plan_name: str | None,
     account_name: str,
     payee_name: str,
-    category_name: str | None,
+    category_group_and_name: str | None,
     date: datetime.date,
     cleared: str,
     amount: Decimal,
@@ -90,7 +90,7 @@ async def run_add_transaction(
         plan_name=plan_name,
         account_name=account_name,
         payee_name=payee_name,
-        category_name=category_name,
+        category_group_and_name=category_group_and_name,
         date=date,
         cleared=cleared,
         amount=amount,
@@ -216,7 +216,7 @@ async def _resolve_add_transaction(
     plan_name: str | None,
     account_name: str,
     payee_name: str,
-    category_name: str | None,
+    category_group_and_name: str | None,
     date: datetime.date,
     cleared: str,
     amount: Decimal,
@@ -245,7 +245,7 @@ async def _resolve_add_transaction(
             f"No payee named {payee_name!r} found in selected plan.",
         )
         category = None
-        if category_name and payee["transfer_account_id"] is None:
+        if category_group_and_name and payee["transfer_account_id"] is None:
             category_row = await _fetch_one_row(
                 con,
                 """
@@ -256,8 +256,8 @@ async def _resolve_add_transaction(
                   AND NOT deleted
                   AND NOT hidden
                 """,
-                (plan.id, category_name),
-                f"No category named {category_name!r} found in selected plan.",
+                (plan.id, category_group_and_name),
+                f"No category group and name {category_group_and_name!r} found in selected plan.",
             )
             category = ResolvedCategory(
                 id=str(category_row["id"]), name=str(category_row["name"])
