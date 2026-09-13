@@ -39,7 +39,7 @@
           "description": "Transaction amount. Positive values are expenses.",
           "name": "Amount"
         },
-        "category_name": {
+        "category_group_and_name": {
           "description": "Category as category group and name separated by a hyphen. Ignored when the payee is another account, which makes the transaction a transfer.",
           "name": "Category"
         },

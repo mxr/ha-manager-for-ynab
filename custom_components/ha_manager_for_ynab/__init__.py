@@ -28,7 +28,7 @@ from homeassistant.util.yaml import load_yaml_dict
 from . import _api
 from .const import ATTR_ACCOUNT_NAME
 from .const import ATTR_AMOUNT
-from .const import ATTR_CATEGORY_NAME
+from .const import ATTR_CATEGORY_GROUP_AND_NAME
 from .const import ATTR_CLEARED
 from .const import ATTR_DATE
 from .const import ATTR_FUND
@@ -109,7 +109,7 @@ ADD_TRANSACTION_SCHEMA = vol.Schema(
         vol.Optional(ATTR_PLAN_NAME): cv.string,
         vol.Required(ATTR_ACCOUNT_NAME): cv.string,
         vol.Required(ATTR_PAYEE_NAME): cv.string,
-        vol.Optional(ATTR_CATEGORY_NAME): cv.string,
+        vol.Optional(ATTR_CATEGORY_GROUP_AND_NAME): cv.string,
         vol.Required(ATTR_USE_CURRENT_DATE, default=True): cv.boolean,
         vol.Required(
             ATTR_DATE, default=lambda: _current_local_date().isoformat()
@@ -295,7 +295,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 plan_name=call.data.get(ATTR_PLAN_NAME),
                 account_name=call.data[ATTR_ACCOUNT_NAME],
                 payee_name=call.data[ATTR_PAYEE_NAME],
-                category_name=call.data.get(ATTR_CATEGORY_NAME),
+                category_group_and_name=call.data.get(ATTR_CATEGORY_GROUP_AND_NAME),
                 date=_current_local_date()
                 if call.data.get(ATTR_USE_CURRENT_DATE, True)
                 else call.data[ATTR_DATE],
@@ -426,8 +426,8 @@ def _set_add_transaction_service_schema(
                     }
                 },
             },
-            ATTR_CATEGORY_NAME: {
-                **fields[ATTR_CATEGORY_NAME],
+            ATTR_CATEGORY_GROUP_AND_NAME: {
+                **fields[ATTR_CATEGORY_GROUP_AND_NAME],
                 "selector": {"select": {"options": categories, "mode": "dropdown"}},
             },
             ATTR_DATE: {
