@@ -222,8 +222,7 @@ async def run_sql_query(db_path: Path, sql: str) -> dict[str, Any]:
         for raw_statement in sql.split(";"):
             if statement := raw_statement.strip():
                 async with con.execute(statement) as cur:
-                    if cur.description is not None:
-                        rows.extend(dict(row) for row in await cur.fetchall())
+                    rows.extend(dict(row) for row in await cur.fetchall())
 
         return {"rows": rows} if rows else {}
 
