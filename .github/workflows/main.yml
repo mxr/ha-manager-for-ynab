@@ -9,7 +9,7 @@ permissions: {}
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       project_files: ${{ steps.filter.outputs.project_files }}
       typing_linting_files: ${{ steps.filter.outputs.typing_linting_files }}
@@ -39,7 +39,7 @@ jobs:
   pre-commit-typing:
     needs: [changes, pre-commit-typing-real]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - env:
         TYPING_LINTING_FILES: ${{ needs.changes.outputs.typing_linting_files }}
@@ -60,7 +60,7 @@ jobs:
   main:
     needs: [changes, main-real]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - env:
         PROJECT_FILES: ${{ needs.changes.outputs.project_files }}
