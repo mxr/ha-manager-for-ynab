@@ -1,0 +1,7 @@
+stack: [python]
+opt:
+  python:
+    packaging: home-assistant
+    home-assistant:
+      name: Manager for YNAB
+      min-version: 2026.4.0
