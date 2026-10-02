@@ -1,4 +1,4 @@
-stack: [python]
+stack: [python, sql]
 opt:
   python:
     packaging: home-assistant
