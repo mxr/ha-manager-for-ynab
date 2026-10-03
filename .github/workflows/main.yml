@@ -25,6 +25,7 @@ jobs:
           project_files:
             - .github/workflows/main.yml
             - '**/*.py'
+            - '**/*.sql'
             - '**/*.toml'
             - custom_components/*/manifest.json
 
