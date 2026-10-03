@@ -6,6 +6,18 @@ ci:
 default_language_version:
   python: python3.14
 repos:
+- repo: https://github.com/adamtheturtle/doccmd-pre-commit
+  rev: 00bc9ef5e997f14a87685cf841978ff99af978c9  # frozen: v2026.9.16.1
+  hooks:
+  - id: doccmd
+    name: doccmd-sqlfluff
+    args:
+    - --no-pad-file
+    - --language
+    - sql
+    - --command
+    - sqlfluff fix --dialect sqlite
+    additional_dependencies: [sqlfluff]
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: a56c0b927e6465d37cae3e97d35d4d18ab2b96cd  # frozen: v0.16.9
   hooks:
@@ -87,6 +99,11 @@ repos:
   hooks:
   - id: actionlint
     additional_dependencies: [github.com/wasilibs/go-shellcheck/cmd/shellcheck@latest]
+- repo: https://github.com/sqlfluff/sqlfluff
+  rev: 0348222a3bcdb0226563f7349c5a39beb0641955  # frozen: 4.4.0
+  hooks:
+  - id: sqlfluff-fix
+    args: [--dialect, sqlite]
 - repo: https://github.com/tombi-toml/tombi-pre-commit
   rev: 18144ee908237e94f42328cba96ba0b2de0eeff4  # frozen: v1.7.0
   hooks:
