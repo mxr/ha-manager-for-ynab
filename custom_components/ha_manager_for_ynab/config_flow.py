@@ -3,7 +3,7 @@
 from typing import Any
 from typing import override
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import ConfigFlow
 from homeassistant.config_entries import ConfigFlowResult
 from sqlite_export_for_ynab import default_db_path as sqlite_default_db_path
@@ -32,13 +32,13 @@ class ManagerForYnabConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="user", data_schema=_user_schema())
 
 
-def _user_schema() -> vol.Schema:
+def _user_schema() -> probatio.Schema:
     """Build the user step schema."""
-    return vol.Schema(
+    return probatio.Schema(
         {
-            vol.Required(CONF_TOKEN): str,
-            vol.Optional(CONF_DB_PATH, default=str(sqlite_default_db_path())): vol.All(
-                str, vol.Length(min=1)
-            ),
+            probatio.Required(CONF_TOKEN): str,
+            probatio.Optional(
+                CONF_DB_PATH, default=str(sqlite_default_db_path())
+            ): probatio.All(str, probatio.Length(min=1)),
         }
     )
