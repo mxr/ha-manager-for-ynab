@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import cast
 
-import voluptuous as vol
+import probatio
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
@@ -78,47 +78,51 @@ def _current_local_date() -> datetime.date:
     return dt_util.now().date()
 
 
-PENDING_INCOME_SCHEMA = vol.Schema(
+PENDING_INCOME_SCHEMA = probatio.Schema(
     {
-        vol.Required("for_real", default=False): cv.boolean,
-        vol.Required("sync", default=True): cv.boolean,
-        vol.Required("quiet", default=False): cv.boolean,
+        probatio.Required("for_real", default=False): cv.boolean,
+        probatio.Required("sync", default=True): cv.boolean,
+        probatio.Required("quiet", default=False): cv.boolean,
     }
 )
-AUTO_APPROVE_SCHEMA = vol.Schema(
+AUTO_APPROVE_SCHEMA = probatio.Schema(
     {
-        vol.Required("for_real", default=False): cv.boolean,
-        vol.Required("sync", default=True): cv.boolean,
-        vol.Required("quiet", default=False): cv.boolean,
+        probatio.Required("for_real", default=False): cv.boolean,
+        probatio.Required("sync", default=True): cv.boolean,
+        probatio.Required("quiet", default=False): cv.boolean,
     }
 )
-SQLITE_EXPORT_SCHEMA = vol.Schema(
+SQLITE_EXPORT_SCHEMA = probatio.Schema(
     {
-        vol.Required("full_refresh", default=False): cv.boolean,
-        vol.Required("quiet", default=False): cv.boolean,
+        probatio.Required("full_refresh", default=False): cv.boolean,
+        probatio.Required("quiet", default=False): cv.boolean,
     }
 )
-SQLITE_QUERY_SCHEMA = vol.Schema(
+SQLITE_QUERY_SCHEMA = probatio.Schema(
     {
-        vol.Required("sync", default=True): cv.boolean,
-        vol.Required(ATTR_SQL): cv.string,
+        probatio.Required("sync", default=True): cv.boolean,
+        probatio.Required(ATTR_SQL): cv.string,
     }
 )
-ADD_TRANSACTION_SCHEMA = vol.Schema(
+ADD_TRANSACTION_SCHEMA = probatio.Schema(
     {
-        vol.Optional(ATTR_PLAN_NAME): cv.string,
-        vol.Required(ATTR_ACCOUNT_NAME): cv.string,
-        vol.Required(ATTR_PAYEE_NAME): cv.string,
-        vol.Optional(ATTR_CATEGORY_GROUP_AND_NAME): cv.string,
-        vol.Required(ATTR_USE_CURRENT_DATE, default=True): cv.boolean,
-        vol.Required(
+        probatio.Optional(ATTR_PLAN_NAME): cv.string,
+        probatio.Required(ATTR_ACCOUNT_NAME): cv.string,
+        probatio.Required(ATTR_PAYEE_NAME): cv.string,
+        probatio.Optional(ATTR_CATEGORY_GROUP_AND_NAME): cv.string,
+        probatio.Required(ATTR_USE_CURRENT_DATE, default=True): cv.boolean,
+        probatio.Required(
             ATTR_DATE, default=lambda: _current_local_date().isoformat()
-        ): vol.Coerce(datetime.date.fromisoformat),
-        vol.Required(ATTR_CLEARED, default=CLEARED_DEFAULT): vol.In(CLEARED_OPTIONS),
-        vol.Required(ATTR_AMOUNT): vol.Coerce(lambda value: Decimal(str(value))),
-        vol.Required(ATTR_FUND, default=True): cv.boolean,
-        vol.Required("sync", default=True): cv.boolean,
-        vol.Required("quiet", default=False): cv.boolean,
+        ): probatio.Coerce(datetime.date.fromisoformat),
+        probatio.Required(ATTR_CLEARED, default=CLEARED_DEFAULT): probatio.In(
+            CLEARED_OPTIONS
+        ),
+        probatio.Required(ATTR_AMOUNT): probatio.Coerce(
+            lambda value: Decimal(str(value))
+        ),
+        probatio.Required(ATTR_FUND, default=True): cv.boolean,
+        probatio.Required("sync", default=True): cv.boolean,
+        probatio.Required("quiet", default=False): cv.boolean,
     }
 )
 

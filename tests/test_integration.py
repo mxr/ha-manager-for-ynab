@@ -10,8 +10,8 @@ from unittest.mock import call
 from unittest.mock import patch
 
 import aiosqlite
+import probatio
 import pytest
-import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import State
 from homeassistant.exceptions import HomeAssistantError
@@ -341,7 +341,7 @@ def test_user_schema_uses_default_db_path(sqlite_default_db_path: Mock) -> None:
     return_value=Path("/tmp/default.sqlite3"),
 )
 def test_user_schema_rejects_empty_db_path(_: Mock) -> None:
-    with pytest.raises(vol.Invalid):
+    with pytest.raises(probatio.Invalid):
         _user_schema()({"token": "token", "db_path": ""})
 
 
