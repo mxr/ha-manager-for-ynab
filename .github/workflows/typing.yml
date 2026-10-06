@@ -30,7 +30,7 @@ jobs:
   typing-real:
     needs: [changes]
     if: needs.changes.outputs.typing_linting_files == 'true'
-    uses: mxr/workflows/.github/workflows/pre-commit-typing.yml@a762c9558b6ece45521c72b5c91c73fad62bd3e6 # v0.1.4
+    uses: mxr/workflows/.github/workflows/pre-commit-typing.yml@460232a04fb17e54ad971b5709114c62816cfd90 # parallel-typing-uv-cache
   typing:
     needs: [changes, typing-real]
     if: always()
