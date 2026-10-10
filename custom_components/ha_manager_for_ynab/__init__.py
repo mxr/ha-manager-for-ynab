@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from homeassistant.helpers.typing import ConfigType
     from manager_for_ynab.auto_approve import AutoApproveResult
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 SERVICES_YAML_PATH = Path(__file__).parent / "services.yaml"
 
