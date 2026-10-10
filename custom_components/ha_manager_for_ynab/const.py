@@ -27,7 +27,7 @@ ATTR_FUND: Final = "fund"
 CLEARED_DEFAULT: Final = TransactionClearedStatus.UNCLEARED.name.lower()
 CLEARED_OPTIONS: Final = [status.name.lower() for status in TransactionClearedStatus]
 
-SERVICE_PENDING_INCOME: Final = "pending_income"
+SERVICE_PENDING_TRANSACTION: Final = "pending_transaction"
 SERVICE_AUTO_APPROVE: Final = "auto_approve"
 SERVICE_SQLITE_EXPORT: Final = "sqlite_export"
 SERVICE_SQLITE_QUERY: Final = "sqlite_query"

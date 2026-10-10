@@ -8,11 +8,11 @@ Home Assistant automations.
 - Config flow for a YNAB personal access token
 - Optional SQLite DB path configuration
 - `auto_approve` action with `for_real`, `sync`, and `quiet`
-- `pending_income` action with `for_real`, `sync`, and `quiet`
+- `pending_transaction` action with `for_real`, `sync`, and `quiet`
 - `sqlite_export` action with `full_refresh` and `quiet`
 - `sqlite_query` action with arbitrary SQL and optional sync
 - `add_transaction` action with values resolved from the SQLite export
-- Sensors for the latest `pending_income` updated count and `auto_approve` approved and cleared counts
+- Sensors for the latest `pending_transaction` updated count and `auto_approve` approved and cleared counts
 
 If the configured DB path is empty, the integration uses `sqlite-export-for-ynab`'s default database path.
 
@@ -46,13 +46,14 @@ Leave the DB path empty to use the default path from `sqlite-export-for-ynab`.
 This runs `manager-for-ynab.auto_approve.auto_approve(...)` and updates the sensors to the returned `updated_count` and
 `cleared` counts.
 
-### `pending_income`
+### `pending_transaction`
 
 - `for_real`: default `false`
 - `sync`: default `true`
 - `quiet`: default `false`
 
-This runs `manager-for-ynab.pending_income.pending_income(...)` and updates the sensor to the returned `updated_count`.
+This runs `manager-for-ynab.pending_transaction.pending_transaction(...)` and updates the sensor to the returned
+`updated_count`.
 
 ### `sqlite_export`
 

@@ -1,4 +1,4 @@
-pending_income:
+pending_transaction:
   fields:
     for_real:
       required: true

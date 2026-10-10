@@ -16,8 +16,8 @@ from manager_for_ynab.add_transaction import ResolvedTransaction
 from manager_for_ynab.add_transaction import add_transaction_and_move_funds
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.auto_approve import auto_approve
-from manager_for_ynab.pending_income import PendingIncomeResult
-from manager_for_ynab.pending_income import pending_income
+from manager_for_ynab.pending_transaction import PendingTransactionResult
+from manager_for_ynab.pending_transaction import pending_transaction
 from sqlite_export_for_ynab._main import sync as sqlite_export_sync
 
 from .const import CLEARED_OPTIONS
@@ -43,12 +43,12 @@ async def run_auto_approve(
     )
 
 
-async def run_pending_income(
+async def run_pending_transaction(
     token: str, db_path: Path, *, for_real: bool, sync: bool, quiet: bool
-) -> PendingIncomeResult:
-    """Run pending income and return the transaction data + how many were updated."""
+) -> PendingTransactionResult:
+    """Run pending transaction and return the transaction data + how many were updated."""
 
-    return await pending_income(
+    return await pending_transaction(
         db=db_path,
         full_refresh=False,
         should_sync=sync,

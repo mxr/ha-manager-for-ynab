@@ -22,8 +22,8 @@
       "auto_approve_cleared_count": {
         "name": "Auto approve cleared count"
       },
-      "pending_income_updated_count": {
-        "name": "Pending income updated count"
+      "pending_transaction_updated_count": {
+        "name": "Pending transaction updated count"
       }
     }
   },
@@ -96,8 +96,8 @@
       },
       "name": "Auto approve"
     },
-    "pending_income": {
-      "description": "Run manager-for-ynab pending income and update the sensor.",
+    "pending_transaction": {
+      "description": "Run manager-for-ynab pending transaction and update the sensor.",
       "fields": {
         "for_real": {
           "description": "Apply the transaction date updates instead of running in dry-run mode.",
@@ -112,7 +112,7 @@
           "name": "Sync"
         }
       },
-      "name": "Pending income"
+      "name": "Pending transaction"
     },
     "sqlite_export": {
       "description": "Run sqlite-export-for-ynab using the configured token and DB path.",

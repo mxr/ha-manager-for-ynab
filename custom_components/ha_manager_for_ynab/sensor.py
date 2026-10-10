@@ -25,9 +25,9 @@ if TYPE_CHECKING:
 
     from . import RuntimeData
 
-PENDING_INCOME_UPDATED_COUNT_DESCRIPTION = SensorEntityDescription(
-    key="pending_income_updated_count",
-    translation_key="pending_income_updated_count",
+PENDING_TRANSACTION_UPDATED_COUNT_DESCRIPTION = SensorEntityDescription(
+    key="pending_transaction_updated_count",
+    translation_key="pending_transaction_updated_count",
     icon="mdi:cash-clock",
     state_class=SensorStateClass.MEASUREMENT,
 )
@@ -55,7 +55,7 @@ async def async_setup_entry(
     """Set up Manager for YNAB sensors."""
     async_add_entities(
         [
-            PendingIncomeUpdatedCountSensor(entry.runtime_data, entry.entry_id),
+            PendingTransactionUpdatedCountSensor(entry.runtime_data, entry.entry_id),
             AutoApproveApprovedCountSensor(entry.runtime_data, entry.entry_id),
             AutoApproveClearedCountSensor(entry.runtime_data, entry.entry_id),
         ]
@@ -112,17 +112,17 @@ class ManagerForYnabCountSensor(RestoreEntity, SensorEntity):
         return self._native_value_getter(self._runtime_data)
 
 
-class PendingIncomeUpdatedCountSensor(ManagerForYnabCountSensor):
-    """Sensor that exposes the last pending income update count."""
+class PendingTransactionUpdatedCountSensor(ManagerForYnabCountSensor):
+    """Sensor that exposes the last pending transaction update count."""
 
     def __init__(self, runtime_data: RuntimeData, entry_id: str) -> None:
         """Initialize the sensor."""
         super().__init__(
             runtime_data,
             entry_id,
-            PENDING_INCOME_UPDATED_COUNT_DESCRIPTION,
-            lambda data: data.pending_income_updated_count,
-            lambda data, value: data.async_set_pending_income_updated_count(value),
+            PENDING_TRANSACTION_UPDATED_COUNT_DESCRIPTION,
+            lambda data: data.pending_transaction_updated_count,
+            lambda data, value: data.async_set_pending_transaction_updated_count(value),
         )
 
 
