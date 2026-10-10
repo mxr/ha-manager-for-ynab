@@ -12,8 +12,10 @@ from unittest.mock import patch
 import aiosqlite
 import probatio
 import pytest
+from homeassistant.config_entries import SOURCE_USER
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import State
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -848,6 +850,60 @@ async def test_config_entry_setup_and_unload(hass: HomeAssistant) -> None:
     assert unload_ok is True
     assert entry.state is ConfigEntryState.NOT_LOADED
     assert hass.data[DOMAIN] == {}
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
+@pytest.mark.asyncio
+async def test_install_via_config_flow(hass: HomeAssistant, tmp_path: Path) -> None:
+    db_path = str(tmp_path / "db.sqlite3")
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "user"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_TOKEN: "token", CONF_DB_PATH: db_path}
+    )
+    await hass.async_block_till_done()
+    assert result.get("type") is FlowResultType.CREATE_ENTRY
+
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.data == {CONF_TOKEN: "token", CONF_DB_PATH: db_path}
+    assert {
+        e.translation_key
+        for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    } == {
+        "auto_approve_approved_count",
+        "auto_approve_cleared_count",
+        "pending_transaction_updated_count",
+    }
+    assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
+    assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION)
+    assert hass.services.has_service(DOMAIN, SERVICE_PENDING_TRANSACTION)
+    assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
+    assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
+
+
+@pytest.mark.usefixtures("enable_custom_integrations")
+@pytest.mark.asyncio
+async def test_install_via_config_flow_aborts_when_already_configured(
+    hass: HomeAssistant,
+) -> None:
+    await setup_integration(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_TOKEN: "token"}
+    )
+
+    assert result.get("type") is FlowResultType.ABORT
+    assert result.get("reason") == "already_configured"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
 
 
 @patch(
