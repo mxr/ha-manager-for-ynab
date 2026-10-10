@@ -20,12 +20,12 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service import async_get_cached_service_description
 from homeassistant.setup import async_setup_component
 from manager_for_ynab.auto_approve import AutoApproveResult
-from manager_for_ynab.pending_income import PendingIncomeResult
+from manager_for_ynab.pending_transaction import PendingTransactionResult
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ha_manager_for_ynab import ADD_TRANSACTION_SCHEMA
 from custom_components.ha_manager_for_ynab import AUTO_APPROVE_SCHEMA
-from custom_components.ha_manager_for_ynab import PENDING_INCOME_SCHEMA
+from custom_components.ha_manager_for_ynab import PENDING_TRANSACTION_SCHEMA
 from custom_components.ha_manager_for_ynab import SQLITE_EXPORT_SCHEMA
 from custom_components.ha_manager_for_ynab import SQLITE_QUERY_SCHEMA
 from custom_components.ha_manager_for_ynab import RuntimeData
@@ -40,12 +40,14 @@ from custom_components.ha_manager_for_ynab.const import CONF_TOKEN
 from custom_components.ha_manager_for_ynab.const import DOMAIN
 from custom_components.ha_manager_for_ynab.const import SERVICE_ADD_TRANSACTION
 from custom_components.ha_manager_for_ynab.const import SERVICE_AUTO_APPROVE
-from custom_components.ha_manager_for_ynab.const import SERVICE_PENDING_INCOME
+from custom_components.ha_manager_for_ynab.const import SERVICE_PENDING_TRANSACTION
 from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_EXPORT
 from custom_components.ha_manager_for_ynab.const import SERVICE_SQLITE_QUERY
 from custom_components.ha_manager_for_ynab.sensor import AutoApproveApprovedCountSensor
 from custom_components.ha_manager_for_ynab.sensor import AutoApproveClearedCountSensor
-from custom_components.ha_manager_for_ynab.sensor import PendingIncomeUpdatedCountSensor
+from custom_components.ha_manager_for_ynab.sensor import (
+    PendingTransactionUpdatedCountSensor,
+)
 from custom_components.ha_manager_for_ynab.sensor import (
     async_setup_entry as sensor_async_setup_entry,
 )
@@ -99,21 +101,21 @@ def test_runtime_data_listener_unsubscribe_is_idempotent() -> None:
     unsubscribe()
     # Calling unsubscribe again should be a no-op once the listener is gone.
     unsubscribe()
-    runtime_data.async_set_pending_income_updated_count(7)
+    runtime_data.async_set_pending_transaction_updated_count(7)
 
     listener.assert_not_called()
 
 
-def test_runtime_data_notifies_listeners_on_pending_income_update() -> None:
+def test_runtime_data_notifies_listeners_on_pending_transaction_update() -> None:
     runtime_data = RuntimeData(token="token", db_path="")
     seen = []
 
     runtime_data.async_add_listener(
-        lambda: seen.append(runtime_data.pending_income_updated_count)
+        lambda: seen.append(runtime_data.pending_transaction_updated_count)
     )
-    runtime_data.async_set_pending_income_updated_count(3)
+    runtime_data.async_set_pending_transaction_updated_count(3)
 
-    assert runtime_data.pending_income_updated_count == 3
+    assert runtime_data.pending_transaction_updated_count == 3
     assert seen == [3]
 
 
@@ -173,11 +175,11 @@ def test_runtime_data_notifies_listeners_on_restored_auto_approve_count(
     assert seen == expected_seen
 
 
-def test_pending_income_sensor_reads_runtime_state() -> None:
+def test_pending_transaction_sensor_reads_runtime_state() -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
-    runtime_data.async_set_pending_income_updated_count(5)
+    runtime_data.async_set_pending_transaction_updated_count(5)
 
-    sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
+    sensor = PendingTransactionUpdatedCountSensor(runtime_data, "entry-1")
 
     assert sensor.native_value == 5
 
@@ -212,66 +214,68 @@ def test_auto_approve_sensor_reads_runtime_state(
     assert sensor.native_value == expected
 
 
-@patch.object(PendingIncomeUpdatedCountSensor, "async_write_ha_state", autospec=True)
-@patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
+@patch.object(
+    PendingTransactionUpdatedCountSensor, "async_write_ha_state", autospec=True
+)
+@patch.object(PendingTransactionUpdatedCountSensor, "async_on_remove", autospec=True)
 @pytest.mark.asyncio
 async def test_sensor_async_added_to_hass_registers_listener(
     async_on_remove: Mock, async_write_ha_state: Mock
 ) -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
-    sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
+    sensor = PendingTransactionUpdatedCountSensor(runtime_data, "entry-1")
 
     await sensor.async_added_to_hass()
     async_on_remove.assert_called_once()
     unsubscribe = async_on_remove.call_args.args[1]
 
-    runtime_data.async_set_pending_income_updated_count(2)
+    runtime_data.async_set_pending_transaction_updated_count(2)
     unsubscribe()
-    runtime_data.async_set_pending_income_updated_count(3)
+    runtime_data.async_set_pending_transaction_updated_count(3)
 
     async_write_ha_state.assert_called_once_with(sensor)
 
 
 @patch.object(
-    PendingIncomeUpdatedCountSensor,
+    PendingTransactionUpdatedCountSensor,
     "async_get_last_state",
     new_callable=AsyncMock,
-    return_value=State("sensor.pending_income_updated_count", "6"),
+    return_value=State("sensor.pending_transaction_updated_count", "6"),
 )
-@patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
+@patch.object(PendingTransactionUpdatedCountSensor, "async_on_remove", autospec=True)
 @pytest.mark.asyncio
 async def test_sensor_async_added_to_hass_restores_last_state(
     async_on_remove: Mock, async_get_last_state: AsyncMock
 ) -> None:
     runtime_data = RuntimeData(token="token", db_path="/tmp/ynab.sqlite3")
-    sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
+    sensor = PendingTransactionUpdatedCountSensor(runtime_data, "entry-1")
 
     await sensor.async_added_to_hass()
 
-    assert runtime_data.pending_income_updated_count == 6
+    assert runtime_data.pending_transaction_updated_count == 6
     async_get_last_state.assert_awaited_once()
     async_on_remove.assert_called_once()
 
 
 @patch.object(
-    PendingIncomeUpdatedCountSensor,
+    PendingTransactionUpdatedCountSensor,
     "async_get_last_state",
     new_callable=AsyncMock,
-    return_value=State("sensor.pending_income_updated_count", "6"),
+    return_value=State("sensor.pending_transaction_updated_count", "6"),
 )
-@patch.object(PendingIncomeUpdatedCountSensor, "async_on_remove", autospec=True)
+@patch.object(PendingTransactionUpdatedCountSensor, "async_on_remove", autospec=True)
 @pytest.mark.asyncio
 async def test_sensor_async_added_to_hass_preserves_runtime_state(
     async_on_remove: Mock, async_get_last_state: AsyncMock
 ) -> None:
     runtime_data = RuntimeData(
-        token="token", db_path="/tmp/ynab.sqlite3", pending_income_updated_count=2
+        token="token", db_path="/tmp/ynab.sqlite3", pending_transaction_updated_count=2
     )
-    sensor = PendingIncomeUpdatedCountSensor(runtime_data, "entry-1")
+    sensor = PendingTransactionUpdatedCountSensor(runtime_data, "entry-1")
 
     await sensor.async_added_to_hass()
 
-    assert runtime_data.pending_income_updated_count == 2
+    assert runtime_data.pending_transaction_updated_count == 2
     async_get_last_state.assert_not_awaited()
     async_on_remove.assert_called_once()
 
@@ -287,7 +291,7 @@ async def test_sensor_async_setup_entry_adds_entity(hass: HomeAssistant) -> None
     )
 
     assert len(added) == 3
-    assert isinstance(added[0], PendingIncomeUpdatedCountSensor)
+    assert isinstance(added[0], PendingTransactionUpdatedCountSensor)
     assert isinstance(added[1], AutoApproveApprovedCountSensor)
     assert isinstance(added[2], AutoApproveClearedCountSensor)
 
@@ -298,7 +302,7 @@ async def test_sensor_async_setup_entry_adds_entity(hass: HomeAssistant) -> None
 )
 def test_service_schemas_default_values(_current_local_date: Mock) -> None:
     assert AUTO_APPROVE_SCHEMA({}) == {"for_real": False, "sync": True, "quiet": False}
-    assert PENDING_INCOME_SCHEMA({}) == {
+    assert PENDING_TRANSACTION_SCHEMA({}) == {
         "for_real": False,
         "sync": True,
         "quiet": False,
@@ -346,17 +350,17 @@ def test_user_schema_rejects_empty_db_path(_: Mock) -> None:
 
 
 @patch(
-    "custom_components.ha_manager_for_ynab._api.pending_income",
+    "custom_components.ha_manager_for_ynab._api.pending_transaction",
     new_callable=AsyncMock,
-    return_value=PendingIncomeResult(transactions=[], updated_count=11),
+    return_value=PendingTransactionResult(transactions=[], updated_count=11),
 )
 @pytest.mark.asyncio
-async def test_api_run_pending_income(pending_income: AsyncMock) -> None:
-    ret = await _api.run_pending_income(
+async def test_api_run_pending_transaction(pending_transaction: AsyncMock) -> None:
+    ret = await _api.run_pending_transaction(
         "token", Path("/tmp/db.sqlite3"), for_real=True, sync=False, quiet=False
     )
-    assert ret == PendingIncomeResult(transactions=[], updated_count=11)
-    pending_income.assert_awaited_once_with(
+    assert ret == PendingTransactionResult(transactions=[], updated_count=11)
+    pending_transaction.assert_awaited_once_with(
         db=Path("/tmp/db.sqlite3"),
         full_refresh=False,
         should_sync=False,
@@ -813,7 +817,7 @@ async def test_async_setup_registers_services(hass: HomeAssistant) -> None:
     assert setup_ok is True
     assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
     assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION)
-    assert hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME)
+    assert hass.services.has_service(DOMAIN, SERVICE_PENDING_TRANSACTION)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
@@ -828,7 +832,7 @@ async def test_async_setup_keeps_existing_services(hass: HomeAssistant) -> None:
 
     assert hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE)
     assert hass.services.has_service(DOMAIN, SERVICE_ADD_TRANSACTION)
-    assert hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME)
+    assert hass.services.has_service(DOMAIN, SERVICE_PENDING_TRANSACTION)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_EXPORT)
     assert hass.services.has_service(DOMAIN, SERVICE_SQLITE_QUERY)
 
@@ -964,7 +968,7 @@ async def test_config_entry_setup_registers_entity_and_device(
     hass: HomeAssistant,
 ) -> None:
     entry = await setup_integration(hass)
-    entity_id = "sensor.manager_for_ynab_pending_income_updated_count"
+    entity_id = "sensor.manager_for_ynab_pending_transaction_updated_count"
     auto_approve_approved_entity_id = (
         "sensor.manager_for_ynab_auto_approve_approved_count"
     )
@@ -989,7 +993,9 @@ async def test_config_entry_setup_registers_entity_and_device(
     assert state is not None
     assert state.state == "unknown"
     assert entity_entry is not None
-    assert entity_entry.unique_id == f"{entry.entry_id}_pending_income_updated_count"
+    assert (
+        entity_entry.unique_id == f"{entry.entry_id}_pending_transaction_updated_count"
+    )
     assert auto_approve_approved_state is not None
     assert auto_approve_approved_state.state == "unknown"
     assert auto_approve_approved_entity_entry is not None
@@ -1017,7 +1023,7 @@ async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> Non
     with pytest.raises(HomeAssistantError, match="Manager for YNAB is not configured"):
         await hass.services.async_call(
             DOMAIN,
-            SERVICE_PENDING_INCOME,
+            SERVICE_PENDING_TRANSACTION,
             {"for_real": False, "sync": False, "quiet": False},
             blocking=True,
         )
@@ -1040,8 +1046,8 @@ async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> Non
     "custom_components.ha_manager_for_ynab._api.run_sqlite_export", return_value=None
 )
 @patch(
-    "custom_components.ha_manager_for_ynab._api.run_pending_income",
-    return_value=PendingIncomeResult(transactions=[], updated_count=4),
+    "custom_components.ha_manager_for_ynab._api.run_pending_transaction",
+    return_value=PendingTransactionResult(transactions=[], updated_count=4),
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
@@ -1051,7 +1057,7 @@ async def test_service_raises_without_a_loaded_entry(hass: HomeAssistant) -> Non
 @pytest.mark.asyncio
 async def test_register_services_success_and_idempotence(
     run_auto_approve: Mock,
-    run_pending_income: Mock,
+    run_pending_transaction: Mock,
     run_sqlite_export: Mock,
     run_add_transaction: Mock,
     get_add_transaction_options: AsyncMock,
@@ -1068,7 +1074,7 @@ async def test_register_services_success_and_idempotence(
     )
     await hass.services.async_call(
         DOMAIN,
-        SERVICE_PENDING_INCOME,
+        SERVICE_PENDING_TRANSACTION,
         {"for_real": True, "sync": True, "quiet": True},
         blocking=True,
     )
@@ -1106,7 +1112,7 @@ async def test_register_services_success_and_idempotence(
     await hass.async_block_till_done()
 
     assert result == {"rows": [{"id": 1}]}
-    state = hass.states.get("sensor.manager_for_ynab_pending_income_updated_count")
+    state = hass.states.get("sensor.manager_for_ynab_pending_transaction_updated_count")
     auto_approve_approved_state = hass.states.get(
         "sensor.manager_for_ynab_auto_approve_approved_count"
     )
@@ -1122,7 +1128,7 @@ async def test_register_services_success_and_idempotence(
     run_auto_approve.assert_called_once_with(
         "token", Path("/tmp/db.sqlite3"), for_real=True, sync=True, quiet=True
     )
-    run_pending_income.assert_called_once_with(
+    run_pending_transaction.assert_called_once_with(
         "token", Path("/tmp/db.sqlite3"), for_real=True, sync=True, quiet=True
     )
     run_sqlite_export.assert_has_calls(
@@ -1154,8 +1160,8 @@ async def test_register_services_success_and_idempotence(
     "custom_components.ha_manager_for_ynab._api.run_add_transaction", return_value=None
 )
 @patch(
-    "custom_components.ha_manager_for_ynab._api.run_pending_income",
-    return_value=PendingIncomeResult(transactions=[], updated_count=4),
+    "custom_components.ha_manager_for_ynab._api.run_pending_transaction",
+    return_value=PendingTransactionResult(transactions=[], updated_count=4),
 )
 @patch(
     "custom_components.ha_manager_for_ynab._api.run_auto_approve",
@@ -1165,7 +1171,7 @@ async def test_register_services_success_and_idempotence(
 @pytest.mark.asyncio
 async def test_register_services_sync_false_skips_schema_refresh(
     run_auto_approve: Mock,
-    run_pending_income: Mock,
+    run_pending_transaction: Mock,
     run_add_transaction: Mock,
     hass: HomeAssistant,
 ) -> None:
@@ -1179,7 +1185,7 @@ async def test_register_services_sync_false_skips_schema_refresh(
     )
     await hass.services.async_call(
         DOMAIN,
-        SERVICE_PENDING_INCOME,
+        SERVICE_PENDING_TRANSACTION,
         {"for_real": True, "sync": False, "quiet": True},
         blocking=True,
     )
@@ -1200,7 +1206,7 @@ async def test_register_services_sync_false_skips_schema_refresh(
 
     await hass.async_block_till_done()
 
-    state = hass.states.get("sensor.manager_for_ynab_pending_income_updated_count")
+    state = hass.states.get("sensor.manager_for_ynab_pending_transaction_updated_count")
     auto_approve_approved_state = hass.states.get(
         "sensor.manager_for_ynab_auto_approve_approved_count"
     )
@@ -1214,7 +1220,7 @@ async def test_register_services_sync_false_skips_schema_refresh(
     assert auto_approve_cleared_state is not None
     assert auto_approve_cleared_state.state == "2"
     run_auto_approve.assert_called_once()
-    run_pending_income.assert_called_once()
+    run_pending_transaction.assert_called_once()
     run_add_transaction.assert_called_once()
 
 
@@ -1290,7 +1296,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
     side_effect=RuntimeError("boom"),
 )
 @patch(
-    "custom_components.ha_manager_for_ynab._api.run_pending_income",
+    "custom_components.ha_manager_for_ynab._api.run_pending_transaction",
     side_effect=RuntimeError("boom"),
 )
 @patch(
@@ -1301,10 +1307,10 @@ async def test_add_transaction_service_uses_current_date_by_default(
     ("service_name", "data", "match"),
     [
         pytest.param(
-            SERVICE_PENDING_INCOME,
+            SERVICE_PENDING_TRANSACTION,
             {"for_real": False, "sync": True, "quiet": False},
-            "pending_income failed: boom",
-            id=SERVICE_PENDING_INCOME,
+            "pending_transaction failed: boom",
+            id=SERVICE_PENDING_TRANSACTION,
         ),
         pytest.param(
             SERVICE_AUTO_APPROVE,
@@ -1345,7 +1351,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
 @pytest.mark.asyncio
 async def test_register_services_error_paths_raise_home_assistant_error(
     run_auto_approve: Mock,
-    run_pending_income: Mock,
+    run_pending_transaction: Mock,
     run_sqlite_export: Mock,
     run_add_transaction: Mock,
     run_sql_query: AsyncMock,

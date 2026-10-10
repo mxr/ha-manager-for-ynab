@@ -44,7 +44,7 @@ from .const import DOMAIN
 from .const import LOGGER
 from .const import SERVICE_ADD_TRANSACTION
 from .const import SERVICE_AUTO_APPROVE
-from .const import SERVICE_PENDING_INCOME
+from .const import SERVICE_PENDING_TRANSACTION
 from .const import SERVICE_SQLITE_EXPORT
 from .const import SERVICE_SQLITE_QUERY
 
@@ -78,7 +78,7 @@ def _current_local_date() -> datetime.date:
     return dt_util.now().date()
 
 
-PENDING_INCOME_SCHEMA = probatio.Schema(
+PENDING_TRANSACTION_SCHEMA = probatio.Schema(
     {
         probatio.Required("for_real", default=False): cv.boolean,
         probatio.Required("sync", default=True): cv.boolean,
@@ -133,7 +133,7 @@ class RuntimeData:
 
     token: str
     db_path: str
-    pending_income_updated_count: int | None = None
+    pending_transaction_updated_count: int | None = None
     auto_approve_approved_count: int | None = None
     auto_approve_cleared_count: int | None = None
     _listeners: list[Callable[[], None]] = field(default_factory=list)
@@ -151,9 +151,9 @@ class RuntimeData:
         return unsubscribe
 
     @callback
-    def async_set_pending_income_updated_count(self, updated_count: int) -> None:
-        """Store the last successful pending income count."""
-        self.pending_income_updated_count = updated_count
+    def async_set_pending_transaction_updated_count(self, updated_count: int) -> None:
+        """Store the last successful pending transaction count."""
+        self.pending_transaction_updated_count = updated_count
         for listener in list(self._listeners):
             listener()
 
@@ -219,10 +219,10 @@ async def async_unload_entry(
 async def _async_register_services(hass: HomeAssistant) -> None:
     """Register integration services."""
 
-    async def async_handle_pending_income(call: ServiceCall) -> None:
+    async def async_handle_pending_transaction(call: ServiceCall) -> None:
         runtime_data = _get_runtime_data(hass)
         try:
-            result = await _api.run_pending_income(
+            result = await _api.run_pending_transaction(
                 runtime_data.token,
                 Path(runtime_data.db_path),
                 for_real=call.data["for_real"],
@@ -230,10 +230,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 quiet=call.data["quiet"],
             )
         except Exception as err:
-            LOGGER.exception("pending_income failed")
-            raise HomeAssistantError(f"pending_income failed: {err}") from err
+            LOGGER.exception("pending_transaction failed")
+            raise HomeAssistantError(f"pending_transaction failed: {err}") from err
 
-        runtime_data.async_set_pending_income_updated_count(result.updated_count)
+        runtime_data.async_set_pending_transaction_updated_count(result.updated_count)
         if call.data["sync"]:
             _schedule_update_add_transaction_service_schema(hass, runtime_data)
 
@@ -315,12 +315,12 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             LOGGER.exception("add_transaction failed")
             raise HomeAssistantError(f"add_transaction failed: {err}") from err
 
-    if not hass.services.has_service(DOMAIN, SERVICE_PENDING_INCOME):
+    if not hass.services.has_service(DOMAIN, SERVICE_PENDING_TRANSACTION):
         hass.services.async_register(
             DOMAIN,
-            SERVICE_PENDING_INCOME,
-            async_handle_pending_income,
-            schema=PENDING_INCOME_SCHEMA,
+            SERVICE_PENDING_TRANSACTION,
+            async_handle_pending_transaction,
+            schema=PENDING_TRANSACTION_SCHEMA,
         )
 
     if not hass.services.has_service(DOMAIN, SERVICE_AUTO_APPROVE):
