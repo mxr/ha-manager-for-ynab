@@ -3,6 +3,7 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import Mock
@@ -226,7 +227,7 @@ async def test_sensor_async_added_to_hass_registers_listener(
     sensor = PendingTransactionUpdatedCountSensor(runtime_data, "entry-1")
 
     await sensor.async_added_to_hass()
-    async_on_remove.assert_called_once()
+    async_on_remove.assert_called_once_with(sensor, ANY)
     unsubscribe = async_on_remove.call_args.args[1]
 
     runtime_data.async_set_pending_transaction_updated_count(2)
@@ -521,11 +522,9 @@ async def test_api_run_add_transaction(
     run_sqlite_export.assert_awaited_once_with(
         "token", db_path, full_refresh=False, quiet=True
     )
-    add_transaction_and_move_funds.assert_awaited_once()
-    assert add_transaction_and_move_funds.call_args.kwargs["token"] == "token"
-    assert add_transaction_and_move_funds.call_args.kwargs["db"] == db_path
-    assert add_transaction_and_move_funds.call_args.kwargs["for_real"] is True
-    assert add_transaction_and_move_funds.call_args.kwargs["quiet"] is True
+    add_transaction_and_move_funds.assert_awaited_once_with(
+        resolved=ANY, token="token", db=db_path, fund=ANY, for_real=True, quiet=True
+    )
     resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"][0]
     assert resolved.plan.id == plan_id
     assert resolved.plan.name == "Budget"
@@ -772,10 +771,7 @@ async def test_config_flow_user_shows_form(async_show_form: MagicMock) -> None:
     result = await flow.async_step_user()
 
     assert result == {"type": "form"}
-    async_show_form.assert_called_once()
-    assert async_show_form.call_args.args == (flow,)
-    assert async_show_form.call_args.kwargs["step_id"] == "user"
-    assert "data_schema" in async_show_form.call_args.kwargs
+    async_show_form.assert_called_once_with(flow, step_id="user", data_schema=ANY)
 
 
 @patch.object(
