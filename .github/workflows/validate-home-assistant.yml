@@ -36,7 +36,14 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-    - uses: home-assistant/actions/hassfest@06749dd8c0b54f350bc69c8752456cee498808a3 # master
+    - uses: docker://ghcr.io/home-assistant/hassfest:2026.10.1@sha256:4b1adfb1e0a37710af0390708eb8000230b80b2193ccffbeed0a901fa9765181
+      with:
+        entrypoint: /bin/sh
+        args: -o pipefail -c "/usr/src/homeassistant/script/hassfest/docker/entrypoint.sh 2>&1 | tee hassfest.log"
+    - if: ${{ !cancelled() }}
+      run: |
+        sed -nE 's/^\* \[(ERROR|WARNING)\] /::error::/p' hassfest.log
+        ! grep -q '^\* \[WARNING\]' hassfest.log
 
   hassfest:
     needs: [changes, hassfest-real]

@@ -24,6 +24,10 @@
     {
       "matchDatasources": ["github-runners"],
       "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
+      "matchDepNames": ["ghcr.io/home-assistant/hassfest"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
     }
   ],
   "prBodyTemplate": "{{{table}}}",
