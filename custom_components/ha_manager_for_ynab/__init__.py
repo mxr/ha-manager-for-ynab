@@ -297,10 +297,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             await _api.run_add_transaction(
                 runtime_data.token,
                 Path(runtime_data.db_path),
-                plan_name=call.data.get(ATTR_PLAN_NAME),
+                plan_name=call.data.get(ATTR_PLAN_NAME) or None,
                 account_name=call.data[ATTR_ACCOUNT_NAME],
                 payee_name=call.data[ATTR_PAYEE_NAME],
-                category_group_and_name=call.data.get(ATTR_CATEGORY_GROUP_AND_NAME),
+                category_group_and_name=call.data.get(ATTR_CATEGORY_GROUP_AND_NAME)
+                or None,
                 date=_current_local_date()
                 if call.data.get(ATTR_USE_CURRENT_DATE, True)
                 else call.data[ATTR_DATE],

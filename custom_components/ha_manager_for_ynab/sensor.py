@@ -107,7 +107,7 @@ class ManagerForYnabCountSensor(RestoreEntity, SensorEntity):
 
     @property
     @override
-    def native_value(self) -> int | None:  # pyright: ignore[reportIncompatibleVariableOverride]
+    def native_value(self) -> int | None:  # pyright: ignore[reportIncompatibleVariableOverride] # ty: ignore[invalid-property-type-override]
         """Return the latest count."""
         return self._native_value_getter(self._runtime_data)
 

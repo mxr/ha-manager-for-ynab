@@ -264,7 +264,7 @@ async def _resolve_add_transaction(
             ),
         )
         category = None
-        if category_group_and_name and payee["transfer_account_id"] is None:
+        if category_group_and_name is not None and payee["transfer_account_id"] is None:
             category_row = await _fetch_one_row(
                 con,
                 """
@@ -301,7 +301,7 @@ async def _resolve_add_transaction(
 async def _resolve_plan(
     con: aiosqlite.Connection, plan_name: str | None
 ) -> ResolvedPlan:
-    if plan_name:
+    if plan_name is not None:
         row = await _fetch_one_row(
             con,
             "SELECT id, name FROM plans WHERE name = ?",
