@@ -30,7 +30,7 @@ jobs:
   typing-real:
     needs: [changes]
     if: needs.changes.outputs.typing_linting_files == 'true'
-    uses: mxr/workflows/.github/workflows/pre-commit-typing.yml@fc12fb90f5ee65211627e2b344eb56a346c9f07e # v0.2.0
+    uses: mxr/workflows/.github/workflows/pre-commit-typing.yml@3a7c6eb381a0464b3e102d92616439dfeac92e26 # v0.3.0
   typing:
     needs: [changes, typing-real]
     if: always()
