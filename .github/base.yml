@@ -2,7 +2,4 @@ stack: [python, sql]
 opt:
   python:
     packaging: home-assistant
-    home-assistant:
-      name: Manager for YNAB
-      min-version: 2026.10.3
     run-type-checks-in-github-actions: true
