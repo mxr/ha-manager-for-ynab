@@ -108,7 +108,9 @@ SQLITE_QUERY_SCHEMA = probatio.Schema(
 ADD_TRANSACTION_SCHEMA = probatio.Schema(
     {
         probatio.Optional(ATTR_PLAN_NAME): cv.string,
-        probatio.Required(ATTR_ACCOUNT_NAME): cv.string,
+        probatio.Required(ATTR_ACCOUNT_NAME): probatio.All(
+            cv.ensure_list, [cv.string], probatio.Length(min=1)
+        ),
         probatio.Required(ATTR_PAYEE_NAME): cv.string,
         probatio.Optional(ATTR_CATEGORY_GROUP_AND_NAME): cv.string,
         probatio.Required(ATTR_USE_CURRENT_DATE, default=True): cv.boolean,
@@ -298,7 +300,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 runtime_data.token,
                 Path(runtime_data.db_path),
                 plan_name=call.data.get(ATTR_PLAN_NAME) or None,
-                account_name=call.data[ATTR_ACCOUNT_NAME],
+                account_names=call.data[ATTR_ACCOUNT_NAME],
                 payee_name=call.data[ATTR_PAYEE_NAME],
                 category_group_and_name=call.data.get(ATTR_CATEGORY_GROUP_AND_NAME)
                 or None,
@@ -420,7 +422,13 @@ def _set_add_transaction_service_schema(
             },
             ATTR_ACCOUNT_NAME: {
                 **fields[ATTR_ACCOUNT_NAME],
-                "selector": {"select": {"options": accounts, "mode": "dropdown"}},
+                "selector": {
+                    "select": {
+                        "options": accounts,
+                        "multiple": True,
+                        "mode": "dropdown",
+                    }
+                },
             },
             ATTR_PAYEE_NAME: {
                 **fields[ATTR_PAYEE_NAME],

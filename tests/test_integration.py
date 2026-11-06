@@ -319,7 +319,7 @@ def test_service_schemas_default_values(_current_local_date: Mock) -> None:
             "amount": "12.34",
         }
     ) == {
-        "account_name": "Checking",
+        "account_name": ["Checking"],
         "payee_name": "Store",
         "use_current_date": True,
         "date": datetime.date(2026, 5, 6),
@@ -510,7 +510,7 @@ async def test_api_run_add_transaction(
         "token",
         db_path,
         plan_name="Budget",
-        account_name="Checking",
+        account_names=["Checking"],
         payee_name="Power Co",
         category_group_and_name="Bills - Electric",
         date=datetime.date(2026, 5, 1),
@@ -560,7 +560,7 @@ async def test_api_run_add_transaction_raises_on_nonzero_result(
             "token",
             db_path,
             plan_name="Budget",
-            account_name="Checking",
+            account_names=["Checking"],
             payee_name="Power Co",
             category_group_and_name="Bills - Electric",
             date=datetime.date(2026, 5, 1),
@@ -590,7 +590,7 @@ async def test_api_run_add_transaction_ignores_transfer_category(
         "token",
         db_path,
         plan_name="Transfer Budget",
-        account_name="Checking",
+        account_names=["Checking"],
         payee_name="Transfer",
         category_group_and_name="Bills - Electric",
         date=datetime.date(2026, 5, 1),
@@ -604,6 +604,65 @@ async def test_api_run_add_transaction_ignores_transfer_category(
     add_transaction_and_move_funds.assert_awaited_once()
     resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"][0]
     assert resolved.category is None
+
+
+@patch(
+    "custom_components.ha_manager_for_ynab._api.add_transaction_and_move_funds",
+    return_value=0,
+)
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_splits_across_accounts(
+    add_transaction_and_move_funds: AsyncMock,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    await _api.run_add_transaction(
+        "token",
+        db_path,
+        plan_name="Split Budget",
+        account_names=["Checking", "Savings", "Card"],
+        payee_name="Power Co",
+        category_group_and_name=None,
+        date=datetime.date(2026, 5, 1),
+        cleared="uncleared",
+        amount=Decimal(10),
+        fund=True,
+        sync=False,
+        quiet=True,
+    )
+
+    resolved = add_transaction_and_move_funds.call_args.kwargs["resolved"]
+    assert [(leg.account.name, leg.amount) for leg in resolved] == [
+        ("Checking", Decimal(5)),
+        ("Savings", Decimal(3)),
+        ("Card", Decimal(2)),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_api_run_add_transaction_rejects_credit_card_not_last(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "db.sqlite3"
+    seed_db(db_path)
+
+    with pytest.raises(RuntimeError, match="credit card account"):
+        await _api.run_add_transaction(
+            "token",
+            db_path,
+            plan_name="Split Budget",
+            account_names=["Card", "Checking"],
+            payee_name="Power Co",
+            category_group_and_name=None,
+            date=datetime.date(2026, 5, 1),
+            cleared="uncleared",
+            amount=Decimal(10),
+            fund=True,
+            sync=False,
+            quiet=True,
+        )
 
 
 @pytest.mark.parametrize(
@@ -660,7 +719,7 @@ async def test_api_run_add_transaction_raises(
             "token",
             db_path,
             plan_name=plan_name,
-            account_name=account_name,
+            account_names=[account_name],
             payee_name="Power Co",
             category_group_and_name=category_group_and_name,
             date=datetime.date(2026, 5, 1),
@@ -689,7 +748,7 @@ async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
         "token",
         db_path,
         plan_name=None,
-        account_name="Checking",
+        account_names=["Checking"],
         payee_name="Power Co",
         category_group_and_name=None,
         date=datetime.date(2026, 5, 1),
@@ -715,7 +774,7 @@ async def test_api_run_add_transaction_without_plans_raises(tmp_path: Path) -> N
             "token",
             db_path,
             plan_name=None,
-            account_name="Checking",
+            account_names=["Checking"],
             payee_name="Power Co",
             category_group_and_name=None,
             date=datetime.date(2026, 5, 1),
@@ -743,7 +802,7 @@ async def test_api_run_add_transaction_explicit_plan_no_sync(
         "token",
         db_path,
         plan_name="Budget",
-        account_name="Checking",
+        account_names=["Checking"],
         payee_name="Power Co",
         category_group_and_name=None,
         date=datetime.date(2026, 5, 1),
@@ -957,6 +1016,7 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
         "custom_value"
         not in description["fields"]["account_name"]["selector"]["select"]
     )
+    assert description["fields"]["account_name"]["selector"]["select"]["multiple"]
     assert (
         "My Category Group - My Category"
         in description["fields"]["category_group_and_name"]["selector"]["select"][
@@ -1194,7 +1254,7 @@ async def test_register_services_success_and_idempotence(
         "token",
         Path("/tmp/db.sqlite3"),
         plan_name="Budget",
-        account_name="Checking",
+        account_names=["Checking"],
         payee_name="Store",
         category_group_and_name="Food - Groceries",
         date=datetime.date(2026, 5, 1),
@@ -1319,7 +1379,7 @@ async def test_add_transaction_service_uses_current_date_by_default(
         "token",
         Path("/tmp/db.sqlite3"),
         plan_name="Budget",
-        account_name="Checking",
+        account_names=["Checking"],
         payee_name="Store",
         category_group_and_name="Food - Groceries",
         date=datetime.date(2026, 5, 6),

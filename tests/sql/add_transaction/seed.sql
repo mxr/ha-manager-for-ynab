@@ -91,6 +91,21 @@ INSERT INTO payees VALUES (
 )
 ;
 
+INSERT INTO plans VALUES ('split-plan', 'Split Budget');
+INSERT INTO accounts VALUES (
+    'split-checking', 'split-plan', 'Checking', 'checking', 5000, 0, 0
+)
+;
+INSERT INTO accounts VALUES (
+    'split-savings', 'split-plan', 'Savings', 'savings', 3000, 0, 0
+)
+;
+INSERT INTO accounts VALUES (
+    'split-card', 'split-plan', 'Card', 'creditCard', 0, 0, 0
+)
+;
+INSERT INTO payees VALUES ('split-payee', 'split-plan', 'Power Co', NULL, 0);
+
 INSERT INTO plans VALUES ('empty-plan', 'Empty Budget');
 INSERT INTO payees VALUES ('empty-payee', 'empty-plan', 'Power Co', NULL, 0);
 

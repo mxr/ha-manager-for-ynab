@@ -13,6 +13,7 @@ from manager_for_ynab.add_transaction import ResolvedCategory
 from manager_for_ynab.add_transaction import ResolvedPayee
 from manager_for_ynab.add_transaction import ResolvedPlan
 from manager_for_ynab.add_transaction import ResolvedTransaction
+from manager_for_ynab.add_transaction import _split_amount_across_accounts
 from manager_for_ynab.add_transaction import add_transaction_and_move_funds
 from manager_for_ynab.auto_approve import AutoApproveResult
 from manager_for_ynab.auto_approve import auto_approve
@@ -72,7 +73,7 @@ async def run_add_transaction(
     db_path: Path,
     *,
     plan_name: str | None,
-    account_name: str,
+    account_names: list[str],
     payee_name: str,
     category_group_and_name: str | None,
     date: datetime.date,
@@ -90,7 +91,7 @@ async def run_add_transaction(
     resolved = await _resolve_add_transaction(
         db_path,
         plan_name=plan_name,
-        account_name=account_name,
+        account_names=account_names,
         payee_name=payee_name,
         category_group_and_name=category_group_and_name,
         date=date,
@@ -98,7 +99,7 @@ async def run_add_transaction(
         amount=amount,
     )
     result = await add_transaction_and_move_funds(
-        resolved=[resolved],
+        resolved=resolved,
         token=token,
         db=db_path,
         fund=fund,
@@ -231,26 +232,29 @@ async def _resolve_add_transaction(
     db_path: Path,
     *,
     plan_name: str | None,
-    account_name: str,
+    account_names: list[str],
     payee_name: str,
     category_group_and_name: str | None,
     date: datetime.date,
     cleared: str,
     amount: Decimal,
-) -> ResolvedTransaction:
+) -> list[ResolvedTransaction]:
     async with aiosqlite.connect(f"file:{db_path}?mode=ro", uri=True) as con:
         con.row_factory = aiosqlite.Row
         plan = await _resolve_plan(con, plan_name)
-        account, payee = await asyncio.gather(
-            _fetch_one_row(
-                con,
-                """
-                SELECT id, name, type, cleared_balance
-                FROM accounts
-                WHERE plan_id = ? AND name = ? AND NOT deleted AND NOT closed
-                """,
-                (plan.id, account_name),
-                f"No open account named {account_name!r} found in selected plan.",
+        *account_rows, payee = await asyncio.gather(
+            *(
+                _fetch_one_row(
+                    con,
+                    """
+                    SELECT id, name, type, cleared_balance
+                    FROM accounts
+                    WHERE plan_id = ? AND name = ? AND NOT deleted AND NOT closed
+                    """,
+                    (plan.id, account_name),
+                    f"No open account named {account_name!r} found in selected plan.",
+                )
+                for account_name in account_names
             ),
             _fetch_one_row(
                 con,
@@ -282,20 +286,37 @@ async def _resolve_add_transaction(
                 id=str(category_row["id"]), name=str(category_row["name"])
             )
 
-    return ResolvedTransaction(
-        plan=plan,
-        account=ResolvedAccount(
-            id=str(account["id"]),
-            name=str(account["name"]),
-            type=str(account["type"]),
-            cleared_balance=int(account["cleared_balance"]),
-        ),
-        payee=ResolvedPayee(id=str(payee["id"]), name=str(payee["name"])),
-        category=category,
-        date=date,
-        cleared=TransactionClearedStatus[cleared.upper()],
-        amount=amount,
-    )
+    accounts = [
+        ResolvedAccount(
+            id=str(row["id"]),
+            name=str(row["name"]),
+            type=str(row["type"]),
+            cleared_balance=int(row["cleared_balance"]),
+        )
+        for row in account_rows
+    ]
+    # Earlier accounts are drained up to their cleared balance; the last covers the rest.
+    credit_card_indexes = [i for i, a in enumerate(accounts) if a.type == "creditCard"]
+    if credit_card_indexes and credit_card_indexes != [len(accounts) - 1]:
+        raise RuntimeError(
+            "At most one credit card account may be used and it must be listed last."
+        )
+
+    return [
+        ResolvedTransaction(
+            plan=plan,
+            account=account,
+            payee=ResolvedPayee(id=str(payee["id"]), name=str(payee["name"])),
+            category=category,
+            date=date,
+            cleared=TransactionClearedStatus[cleared.upper()],
+            amount=split_amount,
+        )
+        for account, split_amount in zip(
+            accounts, _split_amount_across_accounts(amount, accounts), strict=True
+        )
+        if split_amount != 0
+    ]
 
 
 async def _resolve_plan(
