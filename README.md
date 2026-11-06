@@ -72,7 +72,8 @@ This executes the SQL against the configured SQLite DB path and returns rows as 
 ### `add_transaction`
 
 - `plan_name`: optional when the SQLite export has exactly one plan
-- `account_name`: required
+- `account_name`: required, one or more accounts; earlier accounts are drained up to their cleared balance and the last
+  account covers the rest; at most one credit card account, listed last
 - `payee_name`: required
 - `category_group_and_name`: shown by default, formatted as `Category Group - Category Name`; ignored when the payee is
   another account, which makes the transaction a transfer

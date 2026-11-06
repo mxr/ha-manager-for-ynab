@@ -32,8 +32,8 @@
       "description": "Create a YNAB transaction using choices from the SQLite export.",
       "fields": {
         "account_name": {
-          "description": "Account name from the SQLite export.",
-          "name": "Account"
+          "description": "Account names from the SQLite export. Earlier accounts are drained up to their cleared balance and the last account covers the rest. A credit card account must be last.",
+          "name": "Accounts"
         },
         "amount": {
           "description": "Transaction amount. Positive values are expenses.",

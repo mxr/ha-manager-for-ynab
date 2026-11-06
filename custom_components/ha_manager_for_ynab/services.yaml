@@ -82,6 +82,7 @@ add_transaction:
       example: My Account
       selector:
         text:
+          multiple: true
     payee_name:
       required: true
       example: My Payee
