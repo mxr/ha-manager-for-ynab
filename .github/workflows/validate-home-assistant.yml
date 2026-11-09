@@ -36,7 +36,7 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-    - uses: docker://ghcr.io/home-assistant/hassfest:2026.10.4@sha256:f56b995e84c54906263ac96fdb12d2aad2109008d6a2f3a7de6951cc5d836cbb
+    - uses: docker://ghcr.io/home-assistant/hassfest:2026.11.1@sha256:c538e4a67a711292bd40a7d84e5fec254043dc78627d14a8dbd2aa053eb1cd6b
       with:
         entrypoint: /bin/sh
         args: -o pipefail -c "/usr/src/homeassistant/script/hassfest/docker/entrypoint.sh 2>&1 | tee hassfest.log"
