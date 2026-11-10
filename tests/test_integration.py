@@ -1,6 +1,4 @@
 import datetime
-import sqlite3
-from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -71,10 +69,10 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity import Entity
 
 
-def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
-    with closing(sqlite3.connect(db_path)) as con, con:
-        con.executescript(seed_path.read_text())
-        con.commit()
+async def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
+    async with aiosqlite.connect(db_path) as con:
+        await con.executescript(seed_path.read_text())
+        await con.commit()
 
 
 async def setup_integration(
@@ -414,11 +412,11 @@ async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) ->
 @pytest.mark.asyncio
 async def test_api_run_sql_query(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with closing(sqlite3.connect(db_path)) as con, con:
-        con.execute("create table budgets (id integer, name text)")
-        con.execute("insert into budgets values (1, 'Home')")
-        con.execute("insert into budgets values (2, 'Travel')")
-        con.commit()
+    async with aiosqlite.connect(db_path) as con:
+        await con.execute("create table budgets (id integer, name text)")
+        await con.execute("insert into budgets values (1, 'Home')")
+        await con.execute("insert into budgets values (2, 'Travel')")
+        await con.commit()
 
     assert await _api.run_sql_query(
         db_path, "select id, name from budgets order by id"
@@ -441,21 +439,22 @@ async def test_api_run_sql_query(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_api_run_sql_query_write(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with closing(sqlite3.connect(db_path)) as con, con:
-        con.execute("create table budgets (id integer, name text)")
-        con.commit()
+    async with aiosqlite.connect(db_path) as con:
+        await con.execute("create table budgets (id integer, name text)")
+        await con.commit()
 
     with pytest.raises(aiosqlite.DatabaseError):
         await _api.run_sql_query(db_path, "insert into budgets values (1, 'Home')")
 
-    with closing(sqlite3.connect(db_path)) as con, con:
-        assert con.execute("select count(*) from budgets").fetchone() == (0,)
+    async with aiosqlite.connect(db_path) as con:
+        cursor = await con.execute("select count(*) from budgets")
+        assert await cursor.fetchone() == (0,)
 
 
 @pytest.mark.asyncio
 async def test_api_get_add_transaction_options_multiple_plans(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     options = await _api.get_add_transaction_options(db_path)
 
@@ -475,7 +474,7 @@ async def test_api_get_add_transaction_options_flat_lists_are_unique_and_sorted(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     options = await _api.get_add_transaction_options(db_path)
 
@@ -505,7 +504,7 @@ async def test_api_run_add_transaction(
     account_id = "22222222-2222-2222-2222-222222222222"
     payee_id = "33333333-3333-3333-3333-333333333333"
     category_id = "44444444-4444-4444-4444-444444444444"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     await _api.run_add_transaction(
         "token",
@@ -552,7 +551,7 @@ async def test_api_run_add_transaction_raises_on_nonzero_result(
     add_transaction_and_move_funds: AsyncMock, tmp_path: Path
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     with pytest.raises(
         RuntimeError, match="manager-for-ynab add_transaction_and_move_funds failed"
@@ -585,7 +584,7 @@ async def test_api_run_add_transaction_ignores_transfer_category(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     await _api.run_add_transaction(
         "token",
@@ -617,7 +616,7 @@ async def test_api_run_add_transaction_splits_across_accounts(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     await _api.run_add_transaction(
         "token",
@@ -647,7 +646,7 @@ async def test_api_run_add_transaction_rejects_credit_card_not_last(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     with pytest.raises(RuntimeError, match="credit card account"):
         await _api.run_add_transaction(
@@ -713,7 +712,7 @@ async def test_api_run_add_transaction_raises(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path, seed_path)
+    await seed_db(db_path, seed_path)
 
     with pytest.raises(RuntimeError, match=match):
         await _api.run_add_transaction(
@@ -743,7 +742,7 @@ async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path, ADD_TRANSACTION_SINGLE_PLAN_SEED)
+    await seed_db(db_path, ADD_TRANSACTION_SINGLE_PLAN_SEED)
 
     await _api.run_add_transaction(
         "token",
@@ -768,7 +767,7 @@ async def test_api_run_add_transaction_uses_only_plan_when_plan_name_omitted(
 @pytest.mark.asyncio
 async def test_api_run_add_transaction_without_plans_raises(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path, ADD_TRANSACTION_NO_PLANS_SEED)
+    await seed_db(db_path, ADD_TRANSACTION_NO_PLANS_SEED)
 
     with pytest.raises(RuntimeError, match="No plans found in SQLite export"):
         await _api.run_add_transaction(
@@ -797,7 +796,7 @@ async def test_api_run_add_transaction_explicit_plan_no_sync(
     add_transaction_and_move_funds: AsyncMock, tmp_path: Path
 ) -> None:
     db_path = tmp_path / "db.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     await _api.run_add_transaction(
         "token",
@@ -995,7 +994,7 @@ async def test_async_setup_entry_refreshes_add_transaction_schema(
     tmp_path: Path,
 ) -> None:
     db_path = tmp_path / "ynab-schema.sqlite3"
-    seed_db(db_path)
+    await seed_db(db_path)
 
     entry = await setup_integration(hass, db_path=str(db_path))
     description = async_get_cached_service_description(
