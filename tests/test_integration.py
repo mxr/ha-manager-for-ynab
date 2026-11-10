@@ -1,5 +1,6 @@
 import datetime
 import sqlite3
+from contextlib import closing
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -71,7 +72,7 @@ if TYPE_CHECKING:
 
 
 def seed_db(db_path: Path, seed_path: Path = ADD_TRANSACTION_SEED) -> None:
-    with sqlite3.connect(db_path) as con:
+    with closing(sqlite3.connect(db_path)) as con, con:
         con.executescript(seed_path.read_text())
         con.commit()
 
@@ -413,7 +414,7 @@ async def test_api_run_sqlite_export_delegates(sqlite_export_sync: AsyncMock) ->
 @pytest.mark.asyncio
 async def test_api_run_sql_query(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as con:
+    with closing(sqlite3.connect(db_path)) as con, con:
         con.execute("create table budgets (id integer, name text)")
         con.execute("insert into budgets values (1, 'Home')")
         con.execute("insert into budgets values (2, 'Travel')")
@@ -440,14 +441,14 @@ async def test_api_run_sql_query(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_api_run_sql_query_write(tmp_path: Path) -> None:
     db_path = tmp_path / "db.sqlite3"
-    with sqlite3.connect(db_path) as con:
+    with closing(sqlite3.connect(db_path)) as con, con:
         con.execute("create table budgets (id integer, name text)")
         con.commit()
 
     with pytest.raises(aiosqlite.DatabaseError):
         await _api.run_sql_query(db_path, "insert into budgets values (1, 'Home')")
 
-    with sqlite3.connect(db_path) as con:
+    with closing(sqlite3.connect(db_path)) as con, con:
         assert con.execute("select count(*) from budgets").fetchone() == (0,)
 
 
