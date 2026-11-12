@@ -28,7 +28,9 @@ disallow_untyped_defs = false
 module = "tests.*"
 
 [tool.pytest.ini_options]
-# Let Home Assistant install its httpx alias before respx is imported.
+# Importing homeassistant aliases httpx to httpx2 and raises if httpx is already imported.
+# respx's pytest plugin loads before Home Assistant's and imports httpx, so disable it.
+# pytest-homeassistant still imports respx itself, after the alias is in place.
 addopts = "-p no:respx"
 asyncio_default_fixture_loop_scope = "function"
 asyncio_mode = "auto"
