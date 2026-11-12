@@ -53,9 +53,9 @@ repos:
     - coverage
     - homeassistant-stubs
     - manager-for-ynab~=3.0.2
-    - pytest
-    - pytest-asyncio
-    - pytest-homeassistant-custom-component
+    - pytest-asyncio>=1.4.0
+    - pytest-homeassistant
+    - pytest>=9.0.3
     - sqlite-export-for-ynab~=3.0.2
 - repo: https://github.com/mxr/pyright-pre-commit
   rev: 917816f768b32cc3aabd877e48b9001e7bf1b35c  # frozen: v1.1.414
@@ -67,9 +67,9 @@ repos:
     - coverage
     - homeassistant-stubs
     - manager-for-ynab~=3.0.2
-    - pytest
-    - pytest-asyncio
-    - pytest-homeassistant-custom-component
+    - pytest-asyncio>=1.4.0
+    - pytest-homeassistant
+    - pytest>=9.0.3
     - sqlite-export-for-ynab~=3.0.2
 - repo: https://github.com/mxr/sync-typing-deps
   rev: fc38ded36eb5fcf5a9f1147d46b28d80761ac427  # frozen: v0.7.1
@@ -85,9 +85,9 @@ repos:
     - coverage
     - homeassistant-stubs
     - manager-for-ynab~=3.0.2
-    - pytest
-    - pytest-asyncio
-    - pytest-homeassistant-custom-component
+    - pytest-asyncio>=1.4.0
+    - pytest-homeassistant
+    - pytest>=9.0.3
     - sqlite-export-for-ynab~=3.0.2
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
