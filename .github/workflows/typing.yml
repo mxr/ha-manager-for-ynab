@@ -31,6 +31,13 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.typing_linting_files == 'true'
     uses: mxr/workflows/.github/workflows/pre-commit-typing.yml@5c57ccf1f20960bc8902bccf16d72a4e1273ad60 # v0.3.2
+    with:
+      # renovate: datasource=pypi depName=uv
+      uv-version: 0.13.9
+      # renovate: datasource=pypi depName=pre-commit
+      pre-commit-version: 4.7.0
+      # renovate: datasource=pypi depName=pre-commit-uv
+      pre-commit-uv-version: 4.4.3
   typing:
     needs: [changes, typing-real]
     if: always()
